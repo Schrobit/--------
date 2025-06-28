@@ -11,7 +11,7 @@ SMTP_SERVER = 'smtp.exmail.qq.com'  # 企业邮箱SMTP服务器
 SMTP_PORT = 465
 SENDER_EMAIL = 'administrator@ei-power.tech'  # 发送方邮箱
 SENDER_PASSWORD = 't4pFYxV98myHCQqt'  # 邮箱授权码
-SYSTEM_URL = 'https://oa.ei-power.tech'  # 系统访问地址
+SYSTEM_URL = 'https://ei-power.tjh666.cn'  # 系统访问地址
 
 def send_reminder_email(recipient_email, username, remaining_count):
     """发送提醒邮件"""
