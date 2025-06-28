@@ -72,19 +72,38 @@ def init_db():
         )
     ''')
     
+    # 创建通知日志表
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS notification_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            feedback_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            email TEXT NOT NULL,
+            notification_type TEXT NOT NULL,
+            old_status TEXT,
+            new_status TEXT,
+            status TEXT NOT NULL,
+            error_message TEXT,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            handler_name TEXT,
+            FOREIGN KEY (feedback_id) REFERENCES feedback (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
     # 预置用户数据
     users_data = [
         ('admin', 'admin123', 'admin@ei-power.tech', '管理员', True),
-        ('yuanshanzhang', '@ei-power.tech', 'yuanshanzhang@ei-power.tech', '曹彩月', False),
-        ('tongjiahao', '@ei-power.tech', 'tongjiahao@ei-power.tech', '童佳豪', False),
-        ('iiio', '@ei-power.tech', 'iiio@ei-power.tech', '陈佳欣', False),
-        ('xiaoxue', '@ei-power.tech', 'xiaoxue@ei-power.tech', '姜赐雪', False),
-        ('chuaner', '@ei-power.tech', 'chuaner@ei-power.tech', '倪杨钊', False),
-        ('xiaoyuaishuijiao', '@ei-power.tech', 'xiaoyuaishuijiao@ei-power.tech', '王星月', False),
-        ('misa', '@ei-power.tech', 'misa@ei-power.tech', '吴俊豪', False),
-        ('sandishousibushousi', '@ei-power.tech', 'sandishousibushousi@ei-power.tech', '徐茹雯', False),
-        ('noname', '@ei-power.tech', 'noname@ei-power.tech', '叶邱静怡', False),
-        ('wuyigexiaolingcheng', '@ei-power.tech', 'wuyigexiaolingcheng@ei-power.tech', '张彤', False)
+        ('yuanshanzhang', 'user123', 'yuanshanzhang@ei-power.tech', '曹彩月', False),
+        ('tongjiahao', 'user123', 'tongjiahao@ei-power.tech', '童佳豪', False),
+        ('iiio', 'user123', 'iiio@ei-power.tech', '陈佳欣', False),
+        ('xiaoxue', 'user123', 'xiaoxue@ei-power.tech', '姜赐雪', False),
+        ('chuaner', 'user123', 'chuaner@ei-power.tech', '倪杨钊', False),
+        ('xiaoyuaishuijiao', 'user123', 'xiaoyuaishuijiao@ei-power.tech', '王星月', False),
+        ('misa', 'user123', 'misa@ei-power.tech', '吴俊豪', False),
+        ('sandishousibushousi', 'user123', 'sandishousibushousi@ei-power.tech', '徐茹雯', False),
+        ('noname', 'user123', 'noname@ei-power.tech', '叶邱静怡', False),
+        ('wuyigexiaolingcheng', 'user123', 'wuyigexiaolingcheng@ei-power.tech', '张彤', False)
     ]
     
     # 首先检查是否需要添加name字段

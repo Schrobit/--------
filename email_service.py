@@ -11,7 +11,7 @@ SMTP_SERVER = 'smtp.exmail.qq.com'  # 企业邮箱SMTP服务器
 SMTP_PORT = 465
 SENDER_EMAIL = 'administrator@ei-power.tech'  # 发送方邮箱
 SENDER_PASSWORD = 't4pFYxV98myHCQqt'  # 邮箱授权码
-SYSTEM_URL = 'http://localhost:5000'  # 系统访问地址
+SYSTEM_URL = 'https://oa.ei-power.tech'  # 系统访问地址
 
 def send_reminder_email(recipient_email, username, remaining_count):
     """发送提醒邮件"""
@@ -276,6 +276,131 @@ def send_manual_reminder_batch(user_id=None, username=None):
     
     print(f"📈 [手动提醒] 手动提醒完成 - 成功: {success_count}, 失败: {fail_count}")
     return success_count, fail_count
+
+def send_status_update_notification(feedback_id, old_status, new_status, admin_comment='', revised_proposal='', handler_name=''):
+    """发送提案状态更新通知邮件给提议人"""
+    print(f"📧 [状态通知] 开始发送状态更新通知邮件 - 提案ID: {feedback_id}")
+    
+    try:
+        conn = get_db_connection()
+        
+        # 获取提案和用户信息
+        feedback_info = conn.execute('''
+            SELECT f.id, f.content, f.status, f.created_at, u.username, u.email, u.name
+            FROM feedback f
+            JOIN users u ON f.user_id = u.id
+            WHERE f.id = ?
+        ''', (feedback_id,)).fetchone()
+        
+        if not feedback_info:
+            print(f"❌ [状态通知] 未找到提案信息: {feedback_id}")
+            return False
+        
+        # 状态中文映射
+        status_map = {
+            '新提案': '新提案',
+            '处理中': '处理中', 
+            '已解决': '已解决',
+            '已关闭': '已关闭'
+        }
+        
+        old_status_cn = status_map.get(old_status, old_status)
+        new_status_cn = status_map.get(new_status, new_status)
+        
+        # 创建邮件对象
+        msg = MIMEMultipart()
+        msg['From'] = Header(f'团队提案管理系统 <{SENDER_EMAIL}>', 'utf-8')
+        msg['To'] = Header(feedback_info['email'], 'utf-8')
+        msg['Subject'] = Header(f'[提案状态更新] 您的提案 #{feedback_id} 状态已更新', 'utf-8')
+        
+        # 构建邮件正文
+        body_parts = [
+            f"亲爱的 {feedback_info['name'] or feedback_info['username']}，",
+            "",
+            "您好！",
+            "",
+            f"您提交的提案 #{feedback_id} 状态已更新：",
+            "",
+            f"提案内容：{feedback_info['content'][:100]}{'...' if len(feedback_info['content']) > 100 else ''}",
+            f"状态变更：{old_status_cn} → {new_status_cn}",
+            f"处理人员：{handler_name}" if handler_name else "",
+        ]
+        
+        if admin_comment:
+            body_parts.extend([
+                "",
+                "处理意见：",
+                admin_comment
+            ])
+        
+        if revised_proposal:
+            body_parts.extend([
+                "",
+                "修正后的提案：",
+                revised_proposal
+            ])
+        
+        body_parts.extend([
+            "",
+            f"您可以登录系统查看详细信息：{SYSTEM_URL}",
+            "",
+            "如有疑问，请联系管理员。",
+            "",
+            "此邮件为系统自动发送，请勿回复。",
+            "",
+            "团队提案管理系统"
+        ])
+        
+        body = "\n".join(filter(None, body_parts))
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        
+        print(f"📧 [状态通知] 正在连接SMTP服务器 {SMTP_SERVER}:{SMTP_PORT}")
+        
+        # 发送邮件
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        text = msg.as_string()
+        server.sendmail(SENDER_EMAIL, feedback_info['email'], text)
+        server.quit()
+        
+        # 记录通知日志
+        conn.execute('''
+            INSERT INTO notification_logs (feedback_id, user_id, email, notification_type, 
+                                         old_status, new_status, status, sent_at, handler_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            feedback_id, feedback_info['id'], feedback_info['email'], '状态更新',
+            old_status, new_status, '成功', datetime.now(), handler_name
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ [状态通知] 状态更新通知发送成功: {feedback_info['username']} ({feedback_info['email']})")
+        return True
+        
+    except Exception as e:
+        print(f"❌ [状态通知] 发送状态更新通知失败: {str(e)}")
+        
+        # 记录失败日志
+        try:
+            conn = get_db_connection()
+            user_info = conn.execute('SELECT user_id FROM feedback WHERE id = ?', (feedback_id,)).fetchone()
+            if user_info:
+                conn.execute('''
+                    INSERT INTO notification_logs (feedback_id, user_id, notification_type, 
+                                                 old_status, new_status, status, sent_at, error_message, handler_name)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    feedback_id, user_info['user_id'], '状态更新',
+                    old_status, new_status, '失败', datetime.now(), str(e), handler_name
+                ))
+                conn.commit()
+            conn.close()
+        except:
+            pass
+        
+        return False
 
 if __name__ == '__main__':
     import sys

@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+
+{% block title %}通知日志管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-envelope-check"></i> 通知日志管理
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="refreshLogs()">
+                            <i class="bi bi-arrow-clockwise"></i> 刷新
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="clearOldLogs()">
+                            <i class="bi bi-trash"></i> 清理旧日志
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- 统计信息 -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h4 class="mb-1">{{ total_notifications }}</h4>
+                                    <small>总通知数</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4 class="mb-1">{{ success_notifications }}</h4>
+                                    <small>发送成功</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center">
+                                    <h4 class="mb-1">{{ failed_notifications }}</h4>
+                                    <small>发送失败</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h4 class="mb-1">{{ today_notifications }}</h4>
+                                    <small>今日通知</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 筛选器 -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <select class="form-select" id="statusFilter" onchange="filterLogs()">
+                                <option value="all">全部状态</option>
+                                <option value="成功">发送成功</option>
+                                <option value="失败">发送失败</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="typeFilter" onchange="filterLogs()">
+                                <option value="all">全部类型</option>
+                                <option value="状态更新">状态更新</option>
+                                <option value="提醒通知">提醒通知</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" id="searchInput" placeholder="搜索用户邮箱或提案ID..." onkeyup="filterLogs()">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="date" class="form-control" id="dateFilter" onchange="filterLogs()">
+                        </div>
+                    </div>
+
+                    <!-- 通知日志列表 -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>提案ID</th>
+                                    <th>用户邮箱</th>
+                                    <th>通知类型</th>
+                                    <th>状态变更</th>
+                                    <th>发送状态</th>
+                                    <th>处理人</th>
+                                    <th>发送时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logsTableBody">
+                                {% for log in notification_logs %}
+                                <tr class="log-row" 
+                                    data-status="{{ log.status }}" 
+                                    data-type="{{ log.notification_type }}" 
+                                    data-email="{{ log.email }}" 
+                                    data-feedback-id="{{ log.feedback_id }}" 
+                                    data-date="{{ log.sent_at[:10] }}">
+                                    <td>{{ log.id }}</td>
+                                    <td>
+                                        <a href="#" onclick="showFeedbackDetail('{{ log.feedback_id }}')" class="text-decoration-none">
+                                            #{{ log.feedback_id }}
+                                        </a>
+                                    </td>
+                                    <td>{{ log.email }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ log.notification_type }}</span>
+                                    </td>
+                                    <td>
+                                        {% if log.old_status and log.new_status %}
+                                            <small class="text-muted">{{ log.old_status }}</small>
+                                            <i class="bi bi-arrow-right mx-1"></i>
+                                            <small class="fw-bold">{{ log.new_status }}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.status == '成功' %}
+                                            <span class="badge bg-success">{{ log.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">{{ log.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ log.handler_name or '-' }}</td>
+                                    <td>
+                                        <small>{{ log.sent_at }}</small>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info" onclick="showLogDetail('{{ log.id }}')">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        {% if log.status == '失败' %}
+                                        <button class="btn btn-sm btn-outline-warning" onclick="resendNotification('{{ log.feedback_id }}')">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if not notification_logs %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox display-1 text-muted"></i>
+                        <h5 class="text-muted mt-3">暂无通知日志</h5>
+                        <p class="text-muted">当有提案状态更新时，系统会自动发送通知邮件</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 日志详情模态框 -->
+<div class="modal fade" id="logDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">通知日志详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="logDetailContent">
+                <!-- 详情内容将通过JavaScript填充 -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 筛选日志
+function filterLogs() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const typeFilter = document.getElementById('typeFilter').value;
+    const searchInput = document.getElementById('searchInput').value.toLowerCase();
+    const dateFilter = document.getElementById('dateFilter').value;
+    const rows = document.querySelectorAll('.log-row');
+    
+    rows.forEach(row => {
+        const status = row.dataset.status;
+        const type = row.dataset.type;
+        const email = row.dataset.email.toLowerCase();
+        const feedbackId = row.dataset.feedbackId;
+        const date = row.dataset.date;
+        
+        let showRow = true;
+        
+        // 状态筛选
+        if (statusFilter !== 'all' && status !== statusFilter) {
+            showRow = false;
+        }
+        
+        // 类型筛选
+        if (typeFilter !== 'all' && type !== typeFilter) {
+            showRow = false;
+        }
+        
+        // 搜索筛选
+        if (searchInput && !email.includes(searchInput) && !feedbackId.includes(searchInput)) {
+            showRow = false;
+        }
+        
+        // 日期筛选
+        if (dateFilter && date !== dateFilter) {
+            showRow = false;
+        }
+        
+        row.style.display = showRow ? '' : 'none';
+    });
+}
+
+// 显示日志详情
+function showLogDetail(logId) {
+    fetch(`/api/notification_log/${logId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const log = data.log;
+                const content = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>通知ID:</strong> ${log.id}<br>
+                            <strong>提案ID:</strong> #${log.feedback_id}<br>
+                            <strong>用户邮箱:</strong> ${log.email}<br>
+                            <strong>通知类型:</strong> ${log.notification_type}<br>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>发送状态:</strong> <span class="badge ${log.status === '成功' ? 'bg-success' : 'bg-danger'}">${log.status}</span><br>
+                            <strong>处理人:</strong> ${log.handler_name || '-'}<br>
+                            <strong>发送时间:</strong> ${log.sent_at}<br>
+                        </div>
+                    </div>
+                    ${log.old_status && log.new_status ? `
+                    <hr>
+                    <div class="row">
+                        <div class="col-12">
+                            <strong>状态变更:</strong> ${log.old_status} → ${log.new_status}
+                        </div>
+                    </div>
+                    ` : ''}
+                    ${log.error_message ? `
+                    <hr>
+                    <div class="row">
+                        <div class="col-12">
+                            <strong>错误信息:</strong>
+                            <div class="alert alert-danger mt-2">${log.error_message}</div>
+                        </div>
+                    </div>
+                    ` : ''}
+                `;
+                document.getElementById('logDetailContent').innerHTML = content;
+                new bootstrap.Modal(document.getElementById('logDetailModal')).show();
+            } else {
+                alert('获取日志详情失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取日志详情失败');
+        });
+}
+
+// 重新发送通知
+function resendNotification(feedbackId) {
+    if (confirm('确定要重新发送通知邮件吗？')) {
+        fetch(`/api/resend_notification/${feedbackId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('通知邮件重新发送成功');
+                location.reload();
+            } else {
+                alert('重新发送失败: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('重新发送失败');
+        });
+    }
+}
+
+// 刷新日志
+function refreshLogs() {
+    location.reload();
+}
+
+// 清理旧日志
+function clearOldLogs() {
+    if (confirm('确定要清理30天前的旧日志吗？此操作不可恢复。')) {
+        fetch('/api/clear_old_logs', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`成功清理了 ${data.deleted_count} 条旧日志`);
+                location.reload();
+            } else {
+                alert('清理失败: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('清理失败');
+        });
+    }
+}
+
+// 显示提案详情
+function showFeedbackDetail(feedbackId) {
+    // 这里可以跳转到提案详情页面或显示模态框
+    window.open(`/proposals?search=${feedbackId}`, '_blank');
+}
+
+// 设置今天的日期为默认值
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateFilter').value = today;
+});
+</script>
+{% endblock %}

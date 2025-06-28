@@ -300,6 +300,21 @@ def update_feedback():
     conn.commit()
     conn.close()
     
+    # 发送状态更新通知邮件
+    try:
+        from email_service import send_status_update_notification
+        send_status_update_notification(
+            feedback_id=feedback_id,
+            old_status=original_feedback['status'],
+            new_status=status,
+            admin_comment=admin_comment,
+            revised_proposal=revised_proposal if revised_proposal.strip() else '',
+            handler_name=current_user.name
+        )
+    except Exception as e:
+        print(f"邮件通知发送失败: {str(e)}")
+        # 邮件发送失败不影响主要功能，只记录错误
+    
     return redirect(url_for('admin_panel'))
 
 @app.route('/api/today_status')
@@ -416,6 +431,146 @@ def all_proposals():
                          search_query=search_query)
 
 # check_and_send_reminders 函数已移至 email_service.py
+
+@app.route('/notification_logs')
+@login_required
+def notification_logs():
+    """通知日志管理页面（仅管理员可访问）"""
+    if not current_user.is_admin:
+        flash('您没有权限访问此页面', 'error')
+        return redirect(url_for('dashboard'))
+    
+    conn = get_db_connection()
+    
+    # 获取通知日志
+    logs = conn.execute('''
+        SELECT nl.*, u.name as user_name
+        FROM notification_logs nl
+        LEFT JOIN users u ON nl.user_id = u.id
+        ORDER BY nl.sent_at DESC
+        LIMIT 500
+    ''').fetchall()
+    
+    # 获取统计信息
+    total_notifications = conn.execute('SELECT COUNT(*) as count FROM notification_logs').fetchone()['count']
+    success_notifications = conn.execute('SELECT COUNT(*) as count FROM notification_logs WHERE status = "成功"').fetchone()['count']
+    failed_notifications = conn.execute('SELECT COUNT(*) as count FROM notification_logs WHERE status = "失败"').fetchone()['count']
+    today_notifications = conn.execute('''
+        SELECT COUNT(*) as count FROM notification_logs 
+        WHERE date(sent_at) = date('now')
+    ''').fetchone()['count']
+    
+    conn.close()
+    
+    return render_template('notification_logs.html',
+                         notification_logs=[dict(log) for log in logs],
+                         total_notifications=total_notifications,
+                         success_notifications=success_notifications,
+                         failed_notifications=failed_notifications,
+                         today_notifications=today_notifications)
+
+@app.route('/api/notification_log/<int:log_id>')
+@login_required
+def get_notification_log(log_id):
+    """获取通知日志详情API"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    conn = get_db_connection()
+    log = conn.execute('''
+        SELECT nl.*, u.name as user_name
+        FROM notification_logs nl
+        LEFT JOIN users u ON nl.user_id = u.id
+        WHERE nl.id = ?
+    ''', (log_id,)).fetchone()
+    conn.close()
+    
+    if log:
+        return jsonify({'success': True, 'log': dict(log)})
+    else:
+        return jsonify({'success': False, 'message': '日志不存在'})
+
+@app.route('/api/resend_notification/<int:feedback_id>', methods=['POST'])
+@login_required
+def resend_notification(feedback_id):
+    """重新发送通知API"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        conn = get_db_connection()
+        
+        # 获取提案信息
+        feedback = conn.execute('''
+            SELECT f.*, u.email, u.name as user_name
+            FROM feedback f
+            JOIN users u ON f.user_id = u.id
+            WHERE f.id = ?
+        ''', (feedback_id,)).fetchone()
+        
+        if not feedback:
+            conn.close()
+            return jsonify({'success': False, 'message': '提案不存在'})
+        
+        # 获取最新的状态更新记录
+        latest_log = conn.execute('''
+            SELECT * FROM operation_logs 
+            WHERE feedback_id = ? AND action LIKE '%状态更新%'
+            ORDER BY created_at DESC LIMIT 1
+        ''', (feedback_id,)).fetchone()
+        
+        conn.close()
+        
+        # 重新发送通知
+        from email_service import send_status_update_notification
+        
+        old_status = latest_log['details'].split('→')[0].strip() if latest_log and '→' in latest_log['details'] else '未知'
+        new_status = feedback['status']
+        
+        send_status_update_notification(
+            feedback_id=feedback_id,
+            user_id=feedback['user_id'],
+            user_email=feedback['email'],
+            old_status=old_status,
+            new_status=new_status,
+            handler_name=current_user.name,
+            admin_comment=feedback.get('admin_comment', ''),
+            corrected_proposal=feedback.get('corrected_proposal', '')
+        )
+        
+        return jsonify({'success': True, 'message': '通知邮件重新发送成功'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'重新发送失败: {str(e)}'})
+
+@app.route('/api/clear_old_logs', methods=['POST'])
+@login_required
+def clear_old_logs():
+    """清理旧日志API"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        conn = get_db_connection()
+        
+        # 删除30天前的日志
+        result = conn.execute('''
+            DELETE FROM notification_logs 
+            WHERE date(sent_at) < date('now', '-30 days')
+        ''')
+        
+        deleted_count = result.rowcount
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'成功清理了 {deleted_count} 条旧日志',
+            'deleted_count': deleted_count
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'清理失败: {str(e)}'})
 
 if __name__ == '__main__':
     # 初始化数据库
