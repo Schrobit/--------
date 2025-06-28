@@ -658,13 +658,13 @@ def delete_feedback(feedback_id):
                 # 记录邮件发送日志
                 conn = get_db_connection()
                 conn.execute('''
-                    INSERT INTO notification_logs (user_id, feedback_id, email, subject, status, sent_at, error_message)
-                    VALUES (?, ?, ?, ?, ?, datetime('now'), ?)
+                    INSERT INTO notification_logs (user_id, feedback_id, email, notification_type, status, error_message)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 ''', (
                     feedback['user_id'],
                     feedback_id,
                     target_email,
-                    '[通知] 您的提案已被删除',
+                    'delete_notification',
                     '成功',
                     None
                 ))
