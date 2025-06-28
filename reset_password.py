@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 密码重置工具
-用于重置团队反馈管理系统中用户的密码
+用于重置EI Power反馈管理系统中用户的密码
 """
 
 import sqlite3
@@ -89,7 +89,7 @@ def reset_password(username, new_password=None):
 
 def main():
     """主函数"""
-    print("团队反馈管理系统 - 密码重置工具")
+    print("EI Power反馈管理系统 - 密码重置工具")
     print("=" * 40)
     
     if len(sys.argv) < 2:

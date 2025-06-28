@@ -13,6 +13,36 @@ SENDER_EMAIL = 'administrator@ei-power.tech'  # 发送方邮箱
 SENDER_PASSWORD = 't4pFYxV98myHCQqt'  # 邮箱授权码
 SYSTEM_URL = 'https://ei-power.tjh666.cn'  # 系统访问地址
 
+def get_user_email_for_sending(user_id):
+    """获取用户的发送邮箱（交替使用主邮箱和备份邮箱）"""
+    conn = get_db_connection()
+    
+    # 获取用户的邮箱信息
+    user = conn.execute('SELECT email, backup_email FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return None
+    
+    # 获取该用户最近一次发送邮件使用的邮箱
+    last_email = conn.execute(
+        'SELECT email FROM reminder_logs WHERE user_id = ? ORDER BY sent_at DESC LIMIT 1',
+        (user_id,)
+    ).fetchone()
+    
+    conn.close()
+    
+    # 如果有备份邮箱，则交替使用
+    if user['backup_email']:
+        if last_email and last_email['email'] == user['email']:
+            # 上次用的是主邮箱，这次用备份邮箱
+            return user['backup_email']
+        else:
+            # 上次用的是备份邮箱或者是第一次发送，这次用主邮箱
+            return user['email']
+    else:
+        # 没有备份邮箱，使用主邮箱
+        return user['email']
+
 def send_reminder_email(recipient_email, username, remaining_count):
     """发送提醒邮件"""
     print(f"📧 [邮件服务] 开始发送提醒邮件给 {username} ({recipient_email})")
@@ -20,7 +50,7 @@ def send_reminder_email(recipient_email, username, remaining_count):
     try:
         # 创建邮件对象
         msg = MIMEMultipart()
-        msg['From'] = Header(f'团队反馈系统 <{SENDER_EMAIL}>', 'utf-8')
+        msg['From'] = Header(f'EI Power反馈系统 <{SENDER_EMAIL}>', 'utf-8')
         msg['To'] = Header(recipient_email, 'utf-8')
         msg['Subject'] = Header('[行动要求] 今日反馈未提交', 'utf-8')
         
@@ -37,11 +67,11 @@ def send_reminder_email(recipient_email, username, remaining_count):
 
 提交截止时间：今日24:00
 
-如有疑问，请联系管理员。
+如有疑问，请联系admin@ei-power.tech。
 
 此邮件为系统自动发送，请勿回复。
 
-团队反馈管理系统
+EI Power 反馈管理系统
         """.strip()
         
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
@@ -94,7 +124,7 @@ def check_and_send_reminders():
     conn = get_db_connection()
     # 查找今日未提交满3个反馈的用户
     users_to_remind = conn.execute('''
-        SELECT u.id, u.username, u.email,
+        SELECT u.id, u.username, u.email, u.backup_email,
                COALESCE(f.feedback_count, 0) as feedback_count
         FROM users u
         LEFT JOIN (
@@ -115,19 +145,27 @@ def check_and_send_reminders():
         remaining = 3 - user['feedback_count']
         print(f"👤 [邮件提醒] 处理用户: {user['username']} (已提交: {user['feedback_count']}, 剩余: {remaining})")
         
+        # 获取要发送的邮箱地址（交替使用主邮箱和备份邮箱）
+        target_email = get_user_email_for_sending(user['id'])
+        if not target_email:
+            print(f"⚠️ [邮件提醒] 用户 {user['username']} 没有可用的邮箱地址")
+            continue
+            
+        print(f"📧 [邮件提醒] 发送到邮箱: {target_email}")
+        
         try:
-            send_reminder_email(user['email'], user['username'], remaining)
+            send_reminder_email(target_email, user['username'], remaining)
             # 记录提醒日志
             conn.execute(
                 'INSERT INTO reminder_logs (user_id, email, status, sent_at) VALUES (?, ?, ?, ?)',
-                (user['id'], user['email'], '成功', datetime.now())
+                (user['id'], target_email, '成功', datetime.now())
             )
             success_count += 1
         except Exception as e:
             # 记录失败日志
             conn.execute(
                 'INSERT INTO reminder_logs (user_id, email, status, sent_at, error_message) VALUES (?, ?, ?, ?, ?)',
-                (user['id'], user['email'], '失败', datetime.now(), str(e))
+                (user['id'], target_email, '失败', datetime.now(), str(e))
             )
             fail_count += 1
     
@@ -158,7 +196,7 @@ def send_manual_reminder(user_identifier):
     
     # 查找用户
     users_to_remind = conn.execute(f'''
-        SELECT u.id, u.username, u.email,
+        SELECT u.id, u.username, u.email, u.backup_email,
                COALESCE(f.feedback_count, 0) as feedback_count
         FROM users u
         LEFT JOIN (
@@ -179,24 +217,32 @@ def send_manual_reminder(user_identifier):
     remaining = 3 - user['feedback_count']
     print(f"👤 [手动提醒] 处理用户: {user['username']} (已提交: {user['feedback_count']}, 剩余: {remaining})")
     
+    # 获取要发送的邮箱地址（交替使用主邮箱和备份邮箱）
+    target_email = get_user_email_for_sending(user['id'])
+    if not target_email:
+        conn.close()
+        return {'success': False, 'message': f'用户 {user["username"]} 没有可用的邮箱地址'}
+        
+    print(f"📧 [手动提醒] 发送到邮箱: {target_email}")
+    
     try:
-        send_reminder_email(user['email'], user['username'], remaining)
+        send_reminder_email(target_email, user['username'], remaining)
         # 记录提醒日志
         conn.execute(
             'INSERT INTO reminder_logs (user_id, email, status, sent_at) VALUES (?, ?, ?, ?)',
-            (user['id'], user['email'], '手动成功', datetime.now())
+            (user['id'], target_email, '手动成功', datetime.now())
         )
         conn.commit()
         conn.close()
         
-        print(f"✅ [手动提醒] 手动提醒发送成功: {user['username']}")
-        return {'success': True, 'username': user['username'], 'message': f'提醒邮件已发送给 {user["username"]}'}
+        print(f"✅ [手动提醒] 手动提醒发送成功: {user['username']} ({target_email})")
+        return {'success': True, 'username': user['username'], 'message': f'提醒邮件已发送给 {user["username"]} ({target_email})'}
         
     except Exception as e:
         # 记录失败日志
         conn.execute(
             'INSERT INTO reminder_logs (user_id, email, status, sent_at, error_message) VALUES (?, ?, ?, ?, ?)',
-            (user['id'], user['email'], '手动失败', datetime.now(), str(e))
+            (user['id'], target_email, '手动失败', datetime.now(), str(e))
         )
         conn.commit()
         conn.close()
@@ -309,7 +355,7 @@ def send_status_update_notification(feedback_id, old_status, new_status, admin_c
         
         # 创建邮件对象
         msg = MIMEMultipart()
-        msg['From'] = Header(f'团队提案管理系统 <{SENDER_EMAIL}>', 'utf-8')
+        msg['From'] = Header(f'EI Power 提案管理系统 <{SENDER_EMAIL}>', 'utf-8')
         msg['To'] = Header(feedback_info['email'], 'utf-8')
         msg['Subject'] = Header(f'[提案状态更新] 您的提案 #{feedback_id} 状态已更新', 'utf-8')
         
@@ -348,7 +394,7 @@ def send_status_update_notification(feedback_id, old_status, new_status, admin_c
             "",
             "此邮件为系统自动发送，请勿回复。",
             "",
-            "团队提案管理系统"
+            "EI Power 提案管理系统"
         ])
         
         body = "\n".join(filter(None, body_parts))

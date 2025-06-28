@@ -19,6 +19,7 @@ def init_db():
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             email TEXT NOT NULL,
+            backup_email TEXT,
             name TEXT NOT NULL,
             is_admin BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -91,19 +92,19 @@ def init_db():
         )
     ''')
     
-    # 预置用户数据
+    # 预置用户数据 (username, password, email, backup_email, name, is_admin)
     users_data = [
-        ('admin', 'admin123', 'admin@ei-power.tech', '管理员', True),
-        ('yuanshanzhang', 'user123', 'yuanshanzhang@ei-power.tech', '曹彩月', False),
-        ('tongjiahao', 'user123', 'tongjiahao@ei-power.tech', '童佳豪', False),
-        ('iiio', 'user123', 'iiio@ei-power.tech', '陈佳欣', False),
-        ('xiaoxue', 'user123', 'xiaoxue@ei-power.tech', '姜赐雪', False),
-        ('chuaner', 'user123', 'chuaner@ei-power.tech', '倪杨钊', False),
-        ('xiaoyuaishuijiao', 'user123', 'xiaoyuaishuijiao@ei-power.tech', '王星月', False),
-        ('misa', 'user123', 'misa@ei-power.tech', '吴俊豪', False),
-        ('sandishousibushousi', 'user123', 'sandishousibushousi@ei-power.tech', '徐茹雯', False),
-        ('noname', 'user123', 'noname@ei-power.tech', '叶邱静怡', False),
-        ('wuyigexiaolingcheng', 'user123', 'wuyigexiaolingcheng@ei-power.tech', '张彤', False)
+        ('admin', 'admin123', 'admin@ei-power.tech', None, '管理员', True),
+        ('tongjiahao', 'user123', 'tongjiahao@ei-power.tech', 'admin@tjh666.cn', '童佳豪', False),
+        ('misa', 'user123', 'misa@ei-power.tech', 'wjhlxynb666@163.com', '吴俊豪', False),
+        ('yuanshanzhang', 'user123', 'yuanshanzhang@ei-power.tech', '1447091509@qq.com', '曹彩月', False),
+        ('noname', 'user123', 'noname@ei-power.tech', '1473886876@qq.com', '叶邱静怡', False),
+        ('iiio', 'user123', 'iiio@ei-power.tech', '2174874621@qq.com', '陈佳欣', False),
+        ('wuyigexiaolingcheng', 'user123', 'wuyigexiaolingcheng@ei-power.tech', '3512059073@qq.com', '张彤', False),
+        ('xiaoyuaishuijiao', 'user123', 'xiaoyuaishuijiao@ei-power.tech', '2563442458@qq.com', '王星月', False),
+        ('chuaner', 'user123', 'chuaner@ei-power.tech', '807597677@qq.com', '倪杨钊', False),
+        ('sandishousibushousi', 'user123', 'sandishousibushousi@ei-power.tech', '3151247853@qq.com', '徐茹雯', False),
+        ('xiaoxue', 'user123', 'xiaoxue@ei-power.tech', '2757186656@qq.com', '姜赐雪', False)
     ]
     
     # 首先检查是否需要添加name字段
@@ -114,21 +115,29 @@ def init_db():
         conn.execute('ALTER TABLE users ADD COLUMN name TEXT')
         print("已添加name字段到users表")
     
-    for username, password, email, name, is_admin in users_data:
+    # 检查是否需要添加backup_email字段
+    try:
+        conn.execute('SELECT backup_email FROM users LIMIT 1')
+    except sqlite3.OperationalError:
+        # backup_email字段不存在，添加该字段
+        conn.execute('ALTER TABLE users ADD COLUMN backup_email TEXT')
+        print("已添加backup_email字段到users表")
+    
+    for username, password, email, backup_email, name, is_admin in users_data:
         # 检查用户是否已存在
         existing_user = conn.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
         if not existing_user:
             # 使用提供的密码
             password_hash = generate_password_hash(password)
             conn.execute(
-                'INSERT INTO users (username, password, email, name, is_admin) VALUES (?, ?, ?, ?, ?)',
-                (username, password_hash, email, name, is_admin)
+                'INSERT INTO users (username, password, email, backup_email, name, is_admin) VALUES (?, ?, ?, ?, ?, ?)',
+                (username, password_hash, email, backup_email, name, is_admin)
             )
         else:
-            # 更新现有用户的中文姓名
+            # 更新现有用户的中文姓名和备份邮箱
             conn.execute(
-                'UPDATE users SET name = ? WHERE username = ?',
-                (name, username)
+                'UPDATE users SET name = ?, backup_email = ? WHERE username = ?',
+                (name, backup_email, username)
             )
     
     conn.commit()
