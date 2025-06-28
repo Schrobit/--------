@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}仪表盘 - 团队提案管理系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-speedometer2"></i> 个人仪表盘</h2>
+            <span class="badge bg-info fs-6">{{ current_user.username }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- 今日提交状态 -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="row">
+                    <div class="col">
+                        <h1 class="display-4 {% if feedback_count >= 3 %}text-success{% else %}text-warning{% endif %}">
+                            {{ feedback_count }}/3
+                        </h1>
+                        <h5 class="card-title">今日提交状态</h5>
+                        {% if feedback_count >= 3 %}
+                            <span class="badge bg-success fs-6">
+                                <i class="bi bi-check-circle"></i> 已完成
+                            </span>
+                        {% else %}
+                            <span class="badge bg-warning fs-6">
+                                <i class="bi bi-exclamation-triangle"></i> 待提交 {{ 3 - feedback_count }} 个
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-calendar-check"></i> 今日任务</h5>
+                <div class="progress mb-3" style="height: 20px;">
+                    <div class="progress-bar {% if feedback_count >= 3 %}bg-success{% else %}bg-warning{% endif %}" 
+                         role="progressbar" 
+                         style="width: {{ (feedback_count / 3 * 100)|round }}%;">
+                        {{ (feedback_count / 3 * 100)|round }}%
+                    </div>
+                </div>
+                
+                {% if feedback_count < 3 %}
+                    <a href="{{ url_for('submit_feedback') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> 提交提案
+                    </a>
+                {% else %}
+                    <button class="btn btn-success" disabled>
+                        <i class="bi bi-check-circle"></i> 今日任务完成
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 最近提案记录 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> 最近提案记录</h5>
+                    <a href="{{ url_for('history') }}" class="btn btn-outline-primary btn-sm">
+                        查看全部 <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if recent_feedback %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>编号</th>
+                                    <th>内容</th>
+                                    <th>状态</th>
+                                    <th>提交时间</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for feedback in recent_feedback %}
+                                <tr>
+                                    <td><code>{{ feedback.id }}</code></td>
+                                    <td>
+                                        <div class="text-truncate" style="max-width: 300px;" title="{{ feedback.content }}">
+                                            {{ feedback.content }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if feedback.status == '新提案' %}
+                                            <span class="badge bg-primary status-badge">{{ feedback.status }}</span>
+                                        {% elif feedback.status == '处理中' %}
+                                            <span class="badge bg-warning status-badge">{{ feedback.status }}</span>
+                                        {% elif feedback.status == '已解决' %}
+                                            <span class="badge bg-success status-badge">{{ feedback.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ feedback.created_at.strftime('%m-%d %H:%M') if feedback.created_at else '' }}
+                                        </small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox display-1 text-muted"></i>
+                        <h5 class="text-muted mt-3">暂无提案记录</h5>
+                        <p class="text-muted">开始提交您的第一个提案吧！</p>
+                        <a href="{{ url_for('submit_feedback') }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> 立即提交
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 使用提示 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-info border-0" role="alert">
+            <h6><i class="bi bi-lightbulb"></i> 使用提示</h6>
+            <ul class="mb-0">
+                <li>每天需要提交 <strong>3个问题提案</strong></li>
+                <li>系统将在每日 <strong>16:00</strong> 自动提醒未完成提交的成员</li>
+                <li>管理员会及时处理您的提案并给出回复</li>
+                <li>您可以在历史记录中查看提案的处理状态</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 自动刷新页面状态（可选）
+setInterval(function() {
+    // 可以添加AJAX请求来更新状态，这里暂时不实现
+}, 300000); // 5分钟刷新一次
+</script>
+{% endblock %}

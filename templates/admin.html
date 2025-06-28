@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+
+{% block title %}管理面板 - 团队提案管理系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-gear"></i> 管理员面板</h2>
+            <span class="badge bg-danger fs-6">管理员权限</span>
+        </div>
+    </div>
+</div>
+
+<!-- 今日提交状态概览 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-people"></i> 今日团队提交状态</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for user in users_status %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card border-0 {% if user.feedback_count >= 3 %}bg-success bg-opacity-10{% elif user.feedback_count > 0 %}bg-warning bg-opacity-10{% else %}bg-danger bg-opacity-10{% endif %}">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ user.name }}</h6>
+                                        <small class="text-muted">{{ user.email }}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <h4 class="mb-0 {% if user.feedback_count >= 3 %}text-success{% elif user.feedback_count > 0 %}text-warning{% else %}text-danger{% endif %}">
+                                            {{ user.feedback_count }}/3
+                                        </h4>
+                                        {% if user.feedback_count >= 3 %}
+                                            <span class="badge bg-success">已完成</span>
+                                        {% elif user.feedback_count > 0 %}
+                                            <span class="badge bg-warning">进行中</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">未开始</span>
+                                        {% endif %}
+                                        <br>
+                                        <button class="btn btn-outline-primary btn-sm mt-1" 
+                                                onclick="sendManualReminder('{{ user.username }}')" 
+                                                title="发送邮件提醒">
+                                            <i class="bi bi-envelope"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="progress mt-2" style="height: 8px;">
+                                    <div class="progress-bar {% if user.feedback_count >= 3 %}bg-success{% elif user.feedback_count > 0 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                         style="width: {{ (user.feedback_count / 3 * 100)|round }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 待处理反馈 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-list-task"></i> 待处理提案</h5>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm" onclick="filterFeedback('all')">
+                            全部 ({{ pending_feedback|length }})
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="filterFeedback('新提案')">
+                            新提案 ({{ pending_feedback|selectattr('status', 'equalto', '新提案')|list|length }})
+                        </button>
+                        <button class="btn btn-outline-info btn-sm" onclick="filterFeedback('处理中')">
+                            处理中 ({{ pending_feedback|selectattr('status', 'equalto', '处理中')|list|length }})
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if pending_feedback %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 12%;">编号</th>
+                                    <th style="width: 10%;">提议人</th>
+                                    <th style="width: 30%;">提案内容</th>
+                                    <th style="width: 8%;">状态</th>
+                                    <th style="width: 12%;">提交时间</th>
+                                    <th style="width: 28%;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="feedback-tbody">
+                                {% for feedback in pending_feedback %}
+                                <tr class="feedback-row" data-status="{{ feedback.status }}">
+                                    <td><code class="small">{{ feedback.id }}</code></td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ feedback.name }}</span>
+                                        <br><small class="text-muted">{{ feedback.username }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="text-truncate" style="max-width: 250px;" title="{{ feedback.content }}">
+                                            {{ feedback.content }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if feedback.status == '新提案' %}
+                                            <span class="badge bg-primary">{{ feedback.status }}</span>
+                                        {% elif feedback.status == '处理中' %}
+                                            <span class="badge bg-warning">{{ feedback.status }}</span>
+                                        {% elif feedback.status == '已解决' %}
+                                            <span class="badge bg-success">{{ feedback.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ feedback.created_at.strftime('%m-%d %H:%M') if feedback.created_at else '' }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-outline-info btn-sm me-1" 
+                                                data-id="{{ feedback.id }}"
+                                                data-username="{{ feedback.username|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-content="{{ feedback.content|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-status="{{ feedback.status }}"
+                                                data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-handler="{{ feedback.handler or '' }}"
+                                                onclick="viewFeedbackFromData(this)">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-primary btn-sm" 
+                                                data-id="{{ feedback.id }}"
+                                                data-status="{{ feedback.status }}"
+                                                data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                onclick="editFeedbackFromData(this)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-check-circle display-1 text-success"></i>
+                        <h5 class="text-muted mt-3">所有提案已处理完成</h5>
+                        <p class="text-muted">当前没有待处理的提案</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 查看反馈模态框 -->
+<div class="modal fade" id="viewFeedbackModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-file-text"></i> 提案详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>编号：</strong>
+                        <code id="view-id"></code>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>提交人：</strong>
+                        <span id="view-username" class="badge bg-secondary"></span>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <strong>提案内容：</strong>
+                    <div class="bg-light p-3 rounded mt-2" id="view-content"></div>
+                </div>
+                
+                <div class="mb-3">
+                    <strong>当前状态：</strong>
+                    <span id="view-status-badge"></span>
+                </div>
+                
+                <div class="mb-3" id="view-revised-section" style="display: none;">
+                    <strong>修正提案：</strong>
+                    <div class="bg-info bg-opacity-10 p-3 rounded mt-2" id="view-revised-proposal"></div>
+                </div>
+                
+                <div class="mb-3" id="view-comment-section" style="display: none;">
+                    <strong>处理意见：</strong>
+                    <div class="bg-success bg-opacity-10 p-3 rounded mt-2" id="view-admin-comment"></div>
+                </div>
+                
+                <div class="row" id="view-handler-section" style="display: none;">
+                    <div class="col-md-6">
+                        <strong>处理人：</strong>
+                        <span id="view-handler" class="text-muted"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑反馈模态框 -->
+<div class="modal fade" id="editFeedbackModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> 处理提案</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('update_feedback') }}">
+                <div class="modal-body">
+                    <input type="hidden" id="edit-feedback-id" name="feedback_id">
+                    
+                    <div class="mb-3">
+                        <label for="edit-status" class="form-label">
+                            <i class="bi bi-flag"></i> 处理状态 <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="edit-status" name="status" required>
+                            <option value="新提案">新提案</option>
+                            <option value="处理中">处理中</option>
+                            <option value="已解决">已解决</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit-revised-proposal" class="form-label">
+                            <i class="bi bi-lightbulb"></i> 修正提案
+                        </label>
+                        <textarea class="form-control" id="edit-revised-proposal" name="revised_proposal" rows="3" 
+                                placeholder="如有需要，请提供修正后的提案内容..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit-admin-comment" class="form-label">
+                            <i class="bi bi-chat-text"></i> 处理意见
+                        </label>
+                        <textarea class="form-control" id="edit-admin-comment" name="admin_comment" rows="4" 
+                                placeholder="请填写处理意见、解决方案或相关说明..."></textarea>
+                    </div>
+                    
+                    <div class="alert alert-info border-0" role="alert">
+                        <h6><i class="bi bi-info-circle"></i> 处理指南</h6>
+                        <ul class="mb-0 small">
+                            <li><strong>新提案：</strong>刚收到的反馈，尚未开始处理</li>
+                            <li><strong>处理中：</strong>正在分析或解决中，可填写进展说明</li>
+                            <li><strong>已解决：</strong>问题已解决或建议已采纳，需填写处理结果</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> 保存更新
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 筛选反馈
+function filterFeedback(status) {
+    const rows = document.querySelectorAll('.feedback-row');
+    
+    rows.forEach(row => {
+        if (status === 'all' || row.dataset.status === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // 更新按钮状态
+    document.querySelectorAll('.btn-outline-primary, .btn-outline-warning, .btn-outline-info').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+// 查看反馈详情
+function viewFeedback(id, username, content, status, revisedProposal, adminComment, handler) {
+    document.getElementById('view-id').textContent = id;
+    document.getElementById('view-username').textContent = username;
+    document.getElementById('view-content').textContent = content;
+    
+    // 状态徽章
+    const statusBadge = document.getElementById('view-status-badge');
+    if (status === '新提案') {
+        statusBadge.innerHTML = '<span class="badge bg-primary">新提案</span>';
+    } else if (status === '处理中') {
+        statusBadge.innerHTML = '<span class="badge bg-warning">处理中</span>';
+    } else if (status === '已解决') {
+        statusBadge.innerHTML = '<span class="badge bg-success">已解决</span>';
+    }
+    
+    // 修正提案
+    const revisedSection = document.getElementById('view-revised-section');
+    if (revisedProposal && revisedProposal.trim()) {
+        document.getElementById('view-revised-proposal').textContent = revisedProposal;
+        revisedSection.style.display = 'block';
+    } else {
+        revisedSection.style.display = 'none';
+    }
+    
+    // 处理意见
+    const commentSection = document.getElementById('view-comment-section');
+    if (adminComment && adminComment.trim()) {
+        document.getElementById('view-admin-comment').textContent = adminComment;
+        commentSection.style.display = 'block';
+    } else {
+        commentSection.style.display = 'none';
+    }
+    
+    // 处理人
+    const handlerSection = document.getElementById('view-handler-section');
+    if (handler && handler.trim()) {
+        document.getElementById('view-handler').textContent = handler;
+        handlerSection.style.display = 'block';
+    } else {
+        handlerSection.style.display = 'none';
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('viewFeedbackModal'));
+    modal.show();
+}
+
+// 从按钮数据属性查看反馈详情
+function viewFeedbackFromData(button) {
+    var id = button.getAttribute('data-id');
+    var username = button.getAttribute('data-username');
+    var content = button.getAttribute('data-content');
+    var status = button.getAttribute('data-status');
+    var revised = button.getAttribute('data-revised');
+    var comment = button.getAttribute('data-comment');
+    var handler = button.getAttribute('data-handler');
+    
+    viewFeedback(id, username, content, status, revised, comment, handler);
+}
+
+// 编辑反馈
+function editFeedback(id, status, revisedProposal, adminComment) {
+    document.getElementById('edit-feedback-id').value = id;
+    document.getElementById('edit-status').value = status;
+    document.getElementById('edit-revised-proposal').value = revisedProposal || '';
+    document.getElementById('edit-admin-comment').value = adminComment || '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('editFeedbackModal'));
+    modal.show();
+}
+
+// 从按钮数据属性编辑反馈
+function editFeedbackFromData(button) {
+    var id = button.getAttribute('data-id');
+    var status = button.getAttribute('data-status');
+    var revised = button.getAttribute('data-revised');
+    var comment = button.getAttribute('data-comment');
+    
+    editFeedback(id, status, revised, comment);
+}
+
+// 发送手动邮件提醒
+function sendManualReminder(username) {
+    if (!confirm(`确定要向 ${username} 发送邮件提醒吗？`)) {
+        return;
+    }
+    
+    const button = event.target.closest('button');
+    const originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+    
+    fetch('/send_manual_reminder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_identifier: username
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 显示成功消息
+            showAlert('success', data.message);
+            button.innerHTML = '<i class="bi bi-check-circle"></i>';
+            setTimeout(() => {
+                button.innerHTML = originalHtml;
+                button.disabled = false;
+            }, 2000);
+        } else {
+            showAlert('danger', data.message);
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', '发送失败，请稍后重试');
+        button.innerHTML = originalHtml;
+        button.disabled = false;
+    });
+}
+
+// 显示提示消息
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // 3秒后自动消失
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+
+// 自动刷新页面数据
+setInterval(function() {
+    // 可以添加AJAX请求来更新数据，这里暂时不实现
+}, 300000); // 5分钟刷新一次
+</script>
+{% endblock %}

@@ -1,0 +1,8 @@
+APScheduler==3.10.4
+email-validator==2.0.0
+Flask==2.3.3
+Flask-Login==0.6.3
+Flask-WTF==1.1.1
+Jinja2==3.1.2
+Werkzeug==2.3.7
+WTForms==3.0.1

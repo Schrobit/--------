@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}提交提案 - 团队提案管理系统{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-plus-circle"></i> 提交提案</h4>
+            </div>
+            <div class="card-body">
+                <!-- 今日提交状态提示 -->
+                <div class="alert alert-info border-0 mb-4" role="alert">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h6><i class="bi bi-info-circle"></i> 今日提交状态</h6>
+                            <p class="mb-0">您今天已提交 <strong id="current-count">0</strong> 个提案，还需提交 <strong id="remaining-count">3</strong> 个</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-info" role="progressbar" style="width: 0%" id="progress-bar">
+                                    0%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <form method="POST" id="feedback-form">
+                    <div class="mb-4">
+                        <label for="content" class="form-label">
+                            <i class="bi bi-chat-text"></i> 提案内容 <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="content" name="content" rows="6" 
+                                placeholder="请详细描述您遇到的问题、建议或意见..." 
+                                required maxlength="1000"></textarea>
+                        <div class="form-text">
+                            <span class="text-muted">还可输入 <span id="char-count">1000</span> 个字符</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 提交指南 -->
+                    <div class="alert alert-light border" role="alert">
+                        <h6><i class="bi bi-lightbulb"></i> 提案提交指南</h6>
+                        <ul class="mb-0 small">
+                            <li>请确保提案内容具体、清晰，便于管理员理解和处理</li>
+                            <li>可以包含问题描述、改进建议、功能需求等</li>
+                            <li>每个提案将自动生成唯一编号，便于跟踪处理进度</li>
+                            <li>提交后可在历史记录中查看处理状态</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回仪表盘
+                        </a>
+                        <button type="submit" class="btn btn-primary" id="submit-btn">
+                            <i class="bi bi-send"></i> 提交提案
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 提案模板示例 -->
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-file-text"></i> 提案模板参考</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary">问题提案</h6>
+                        <div class="bg-light p-3 rounded small">
+                            <strong>问题描述：</strong>登录页面在移动端显示异常<br>
+                            <strong>重现步骤：</strong>使用手机浏览器访问登录页<br>
+                            <strong>期望结果：</strong>页面应该自适应移动端屏幕
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-success">改进建议</h6>
+                        <div class="bg-light p-3 rounded small">
+                            <strong>建议内容：</strong>增加数据导出功能<br>
+                            <strong>使用场景：</strong>需要将反馈数据导出为Excel进行分析<br>
+                            <strong>预期效果：</strong>提高数据处理效率
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-info">功能需求</h6>
+                        <div class="bg-light p-3 rounded small">
+                            <strong>需求描述：</strong>希望增加消息推送功能<br>
+                            <strong>应用场景：</strong>反馈被处理时及时通知提交者<br>
+                            <strong>优先级：</strong>中等
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 字符计数功能
+const contentTextarea = document.getElementById('content');
+const charCountSpan = document.getElementById('char-count');
+const maxLength = 1000;
+
+contentTextarea.addEventListener('input', function() {
+    const currentLength = this.value.length;
+    const remaining = maxLength - currentLength;
+    charCountSpan.textContent = remaining;
+    
+    if (remaining < 100) {
+        charCountSpan.className = 'text-warning';
+    } else if (remaining < 50) {
+        charCountSpan.className = 'text-danger';
+    } else {
+        charCountSpan.className = 'text-muted';
+    }
+});
+
+// 获取当前提交状态
+fetch('/api/today_status')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const currentCount = data.feedback_count;
+            const remaining = 3 - currentCount;
+            const percentage = Math.round((currentCount / 3) * 100);
+            
+            document.getElementById('current-count').textContent = currentCount;
+            document.getElementById('remaining-count').textContent = remaining;
+            document.getElementById('progress-bar').style.width = percentage + '%';
+            document.getElementById('progress-bar').textContent = percentage + '%';
+            
+            // 如果已提交3个，禁用提交按钮
+            if (currentCount >= 3) {
+                document.getElementById('submit-btn').disabled = true;
+                document.getElementById('submit-btn').innerHTML = '<i class="bi bi-check-circle"></i> 今日已完成';
+                document.getElementById('content').disabled = true;
+                
+                // 显示完成提示
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success border-0';
+                alertDiv.innerHTML = '<i class="bi bi-check-circle"></i> 您今日的提案提交任务已完成，感谢您的参与！';
+                document.querySelector('.card-body').insertBefore(alertDiv, document.querySelector('form'));
+            }
+        }
+    })
+    .catch(error => {
+        console.error('获取状态失败:', error);
+    });
+
+// 表单提交确认
+document.getElementById('feedback-form').addEventListener('submit', function(e) {
+    const content = document.getElementById('content').value.trim();
+    if (content.length < 10) {
+        e.preventDefault();
+        alert('提案内容至少需要10个字符，请提供更详细的描述。');
+        return false;
+    }
+    
+    // 提交确认
+    if (!confirm('确认提交此提案吗？提交后将无法修改。')) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // 禁用提交按钮防止重复提交
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 提交中...';
+});
+</script>
+{% endblock %}
