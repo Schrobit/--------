@@ -43,11 +43,68 @@ def get_user_email_for_sending(user_id):
         # 没有备份邮箱，使用主邮箱
         return user['email']
 
+def send_deletion_notification_email(recipient_email, username, feedback_content, admin_name, deletion_reason=""):
+    """发送提案删除通知邮件"""
+    print(f"📧 [邮件服务] 开始发送删除通知邮件给 {username} ({recipient_email})")
+    
+    try:
+        import smtplib
+        
+        # 创建邮件对象
+        msg = MIMEMultipart()
+        msg['From'] = Header(f'EI Power反馈系统 <{SENDER_EMAIL}>', 'utf-8')
+        msg['To'] = Header(recipient_email, 'utf-8')
+        msg['Subject'] = Header('[通知] 您的提案已被删除', 'utf-8')
+        
+        # 邮件正文
+        reason_text = f"\n删除原因：{deletion_reason}" if deletion_reason else ""
+        
+        body = f"""
+亲爱的 {username}，
+
+您好！
+
+您提交的以下提案已被管理员删除：
+
+提案内容：{feedback_content}
+处理人员：{admin_name}{reason_text}
+
+如对此操作有疑问，请联系管理员 admin@ei-power.tech。
+
+此邮件为系统自动发送，请勿回复。
+
+EI Power 反馈管理系统
+        """.strip()
+        
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        
+        print(f"📧 [邮件服务] 正在连接SMTP服务器 {SMTP_SERVER}:{SMTP_PORT}")
+        
+        # 连接SMTP服务器并发送邮件 - 使用SSL连接
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        
+        print(f"📧 [邮件服务] 正在进行身份验证...")
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        
+        print(f"📧 [邮件服务] 正在发送邮件...")
+        text = msg.as_string()
+        server.sendmail(SENDER_EMAIL, recipient_email, text)
+        server.quit()
+        
+        print(f"✅ [邮件服务] 删除通知邮件发送成功: {username} ({recipient_email})")
+        return True
+        
+    except Exception as e:
+        print(f"❌ [邮件服务] 发送删除通知邮件失败: {str(e)}")
+        print(f"❌ [邮件服务] 收件人: {username} ({recipient_email})")
+        raise e
+
 def send_reminder_email(recipient_email, username, remaining_count):
     """发送提醒邮件"""
     print(f"📧 [邮件服务] 开始发送提醒邮件给 {username} ({recipient_email})")
     
     try:
+        import smtplib
         # 创建邮件对象
         msg = MIMEMultipart()
         msg['From'] = Header(f'EI Power反馈系统 <{SENDER_EMAIL}>', 'utf-8')

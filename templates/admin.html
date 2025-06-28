@@ -1,3 +1,4 @@
+<!-- Jinja2 Template File -->
 {% extends "base.html" %}
 
 {% block title %}管理面板 - EI Power提案管理系统{% endblock %}
@@ -49,9 +50,11 @@
                                         </button>
                                     </div>
                                 </div>
+                                {% set progress_class = 'bg-success' if user.feedback_count >= 3 else ('bg-warning' if user.feedback_count > 0 else 'bg-danger') %}
+                                {% set progress_width = (user.feedback_count / 3 * 100)|round %}
                                 <div class="progress mt-2" style="height: 8px;">
-                                    <div class="progress-bar {% if user.feedback_count >= 3 %}bg-success{% elif user.feedback_count > 0 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                         style="width: {{ (user.feedback_count / 3 * 100)|round }}%;"></div>
+                                    <div class="progress-bar {{ progress_class }}" 
+                                         style="width: {{ progress_width }}%"></div>
                                 </div>
                             </div>
                         </div>
@@ -63,100 +66,206 @@
     </div>
 </div>
 
-<!-- 待处理反馈 -->
+<!-- 提案管理 -->
 <div class="row">
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-list-task"></i> 待处理提案</h5>
-                    <div>
-                        <button class="btn btn-outline-primary btn-sm" onclick="filterFeedback('all')">
-                            全部 ({{ pending_feedback|length }})
-                        </button>
-                        <button class="btn btn-outline-warning btn-sm" onclick="filterFeedback('新提案')">
-                            新提案 ({{ pending_feedback|selectattr('status', 'equalto', '新提案')|list|length }})
-                        </button>
-                        <button class="btn btn-outline-info btn-sm" onclick="filterFeedback('处理中')">
-                            处理中 ({{ pending_feedback|selectattr('status', 'equalto', '处理中')|list|length }})
-                        </button>
-                    </div>
-                </div>
+                <h5 class="mb-0"><i class="bi bi-list-task"></i> 提案管理</h5>
             </div>
             <div class="card-body">
-                {% if pending_feedback %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="width: 12%;">编号</th>
-                                    <th style="width: 10%;">提议人</th>
-                                    <th style="width: 30%;">提案内容</th>
-                                    <th style="width: 8%;">状态</th>
-                                    <th style="width: 12%;">提交时间</th>
-                                    <th style="width: 28%;">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="feedback-tbody">
-                                {% for feedback in pending_feedback %}
-                                <tr class="feedback-row" data-status="{{ feedback.status }}">
-                                    <td><code class="small">{{ feedback.id }}</code></td>
-                                    <td>
-                                        <span class="badge bg-secondary">{{ feedback.name }}</span>
-                                        <br><small class="text-muted">{{ feedback.username }}</small>
-                                    </td>
-                                    <td>
-                                        <div class="text-truncate" style="max-width: 250px;" title="{{ feedback.content }}">
-                                            {{ feedback.content }}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {% if feedback.status == '新提案' %}
-                                            <span class="badge bg-primary">{{ feedback.status }}</span>
-                                        {% elif feedback.status == '处理中' %}
-                                            <span class="badge bg-warning">{{ feedback.status }}</span>
-                                        {% elif feedback.status == '已解决' %}
-                                            <span class="badge bg-success">{{ feedback.status }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">
-                                            {{ feedback.created_at.strftime('%m-%d %H:%M') if feedback.created_at else '' }}
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-outline-info btn-sm me-1" 
-                                                data-id="{{ feedback.id }}"
-                                                data-username="{{ feedback.username|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                                data-content="{{ feedback.content|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                                data-status="{{ feedback.status }}"
-                                                data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                                data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                                data-handler="{{ feedback.handler or '' }}"
-                                                onclick="viewFeedbackFromData(this)">
-                                            <i class="bi bi-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-primary btn-sm" 
-                                                data-id="{{ feedback.id }}"
-                                                data-status="{{ feedback.status }}"
-                                                data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                                data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                                onclick="editFeedbackFromData(this)">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <!-- 选项卡导航 -->
+                <ul class="nav nav-tabs mb-3" id="feedbackTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                            <i class="bi bi-clock"></i> 待处理提案 
+                            <span class="badge bg-primary ms-1">{{ pending_feedback|length }}</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="resolved-tab" data-bs-toggle="tab" data-bs-target="#resolved" type="button" role="tab">
+                            <i class="bi bi-check-circle"></i> 已解决提案 
+                            <span class="badge bg-success ms-1">{{ resolved_feedback|length }}</span>
+                        </button>
+                    </li>
+                </ul>
+                
+                <!-- 选项卡内容 -->
+                <div class="tab-content" id="feedbackTabContent">
+                    <!-- 待处理提案选项卡 -->
+                    <div class="tab-pane fade show active" id="pending" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">待处理提案列表</h6>
+                            <div>
+                                <button class="btn btn-outline-primary btn-sm" onclick="filterFeedback('all')">
+                                    全部 ({{ pending_feedback|length }})
+                                </button>
+                                <button class="btn btn-outline-warning btn-sm" onclick="filterFeedback('新提案')">
+                                    新提案 ({{ pending_feedback|selectattr('status', 'equalto', '新提案')|list|length }})
+                                </button>
+                                <button class="btn btn-outline-info btn-sm" onclick="filterFeedback('处理中')">
+                                    处理中 ({{ pending_feedback|selectattr('status', 'equalto', '处理中')|list|length }})
+                                </button>
+                            </div>
+                        </div>
+                        {% if pending_feedback %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 12%;">编号</th>
+                                            <th style="width: 10%;">提议人</th>
+                                            <th style="width: 30%;">提案内容</th>
+                                            <th style="width: 8%;">状态</th>
+                                            <th style="width: 12%;">提交时间</th>
+                                            <th style="width: 28%;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="feedback-tbody">
+                                        {% for feedback in pending_feedback %}
+                                        <tr class="feedback-row" data-status="{{ feedback.status }}">
+                                            <td><code class="small">{{ feedback.id }}</code></td>
+                                            <td>
+                                                <span class="badge bg-secondary">{{ feedback.name }}</span>
+                                                <br><small class="text-muted">{{ feedback.username }}</small>
+                                            </td>
+                                            <td>
+                                                <div class="text-truncate" style="max-width: 250px;" title="{{ feedback.content }}">
+                                                    {{ feedback.content }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {% if feedback.status == '新提案' %}
+                                                    <span class="badge bg-primary">{{ feedback.status }}</span>
+                                                {% elif feedback.status == '处理中' %}
+                                                    <span class="badge bg-warning">{{ feedback.status }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ feedback.created_at.strftime('%m-%d %H:%M') if feedback.created_at else '' }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-outline-info btn-sm me-1" 
+                                                        data-id="{{ feedback.id }}"
+                                                        data-username="{{ feedback.username|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-content="{{ feedback.content|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-status="{{ feedback.status }}"
+                                                        data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-handler="{{ feedback.handler or '' }}"
+                                                        onclick="viewFeedbackFromData(this)"
+                                                        title="查看详情">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                <button class="btn btn-outline-primary btn-sm me-1" 
+                                                        data-id="{{ feedback.id }}"
+                                                        data-status="{{ feedback.status }}"
+                                                        data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        onclick="editFeedbackFromData(this)"
+                                                        title="编辑提案">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger btn-sm" 
+                                                        data-id="{{ feedback.id }}"
+                                                        data-username="{{ feedback.username|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        onclick="deleteFeedback(this)"
+                                                        title="删除提案">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="bi bi-check-circle display-1 text-success"></i>
+                                <h5 class="text-muted mt-3">所有提案已处理完成</h5>
+                                <p class="text-muted">当前没有待处理的提案</p>
+                            </div>
+                        {% endif %}
                     </div>
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="bi bi-check-circle display-1 text-success"></i>
-                        <h5 class="text-muted mt-3">所有提案已处理完成</h5>
-                        <p class="text-muted">当前没有待处理的提案</p>
+                    
+                    <!-- 已解决提案选项卡 -->
+                    <div class="tab-pane fade" id="resolved" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">已解决提案列表</h6>
+                            <span class="text-muted">共 {{ resolved_feedback|length }} 个已解决提案</span>
+                        </div>
+                        
+                        {% if resolved_feedback %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 12%;">编号</th>
+                                            <th style="width: 10%;">提议人</th>
+                                            <th style="width: 30%;">提案内容</th>
+                                            <th style="width: 8%;">状态</th>
+                                            <th style="width: 12%;">解决时间</th>
+                                            <th style="width: 28%;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for feedback in resolved_feedback %}
+                                        <tr>
+                                            <td><code class="small">{{ feedback.id }}</code></td>
+                                            <td>
+                                                <span class="badge bg-secondary">{{ feedback.name }}</span>
+                                                <br><small class="text-muted">{{ feedback.username }}</small>
+                                            </td>
+                                            <td>
+                                                <div class="text-truncate" style="max-width: 250px;" title="{{ feedback.content }}">
+                                                    {{ feedback.content }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">{{ feedback.status }}</span>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ feedback.updated_at.strftime('%m-%d %H:%M') if feedback.updated_at else '' }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-outline-info btn-sm me-1" 
+                                                        data-id="{{ feedback.id }}"
+                                                        data-username="{{ feedback.username|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-content="{{ feedback.content|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-status="{{ feedback.status }}"
+                                                        data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-handler="{{ feedback.handler or '' }}"
+                                                        onclick="viewFeedbackFromData(this)"
+                                                        title="查看详情">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger btn-sm" 
+                                                        data-id="{{ feedback.id }}"
+                                                        data-username="{{ feedback.username|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        onclick="deleteFeedback(this)"
+                                                        title="删除提案">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="bi bi-archive display-1 text-muted"></i>
+                                <h5 class="text-muted mt-3">暂无已解决提案</h5>
+                                <p class="text-muted">已解决的提案将显示在这里</p>
+                            </div>
+                        {% endif %}
                     </div>
-                {% endif %}
+                </div>
             </div>
         </div>
     </div>
@@ -278,6 +387,16 @@
 
 {% block scripts %}
 <script>
+// 页面加载完成后的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Admin page loaded successfully');
+    console.log('Bootstrap available:', typeof bootstrap !== 'undefined');
+    
+    // 检查所有删除按钮
+    const deleteButtons = document.querySelectorAll('[onclick*="deleteFeedback"]');
+    console.log('Found delete buttons:', deleteButtons.length);
+});
+
 // 筛选反馈
 function filterFeedback(status) {
     const rows = document.querySelectorAll('.feedback-row');
@@ -376,6 +495,170 @@ function editFeedbackFromData(button) {
     var comment = button.getAttribute('data-comment');
     
     editFeedback(id, status, revised, comment);
+}
+
+// 删除提案
+function deleteFeedback(button) {
+    try {
+        console.log('deleteFeedback called with button:', button);
+        const feedbackId = button.getAttribute('data-id');
+        const username = button.getAttribute('data-username');
+        console.log('feedbackId:', feedbackId, 'username:', username);
+        
+        // 显示删除确认对话框
+        showDeleteConfirmModal(feedbackId, username, button);
+    } catch (error) {
+        console.error('Error in deleteFeedback:', error);
+        showAlert('danger', '删除功能出错: ' + error.message);
+    }
+}
+
+// 显示删除确认模态框
+function showDeleteConfirmModal(feedbackId, username, button) {
+    try {
+        console.log('showDeleteConfirmModal called with:', feedbackId, username, button);
+    // 创建模态框HTML
+    const modalHtml = `
+        <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> 确认删除提案</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning" role="alert">
+                            <strong>警告：</strong>此操作不可撤销！删除后将自动通知提议人。
+                        </div>
+                        <p><strong>提案编号：</strong>#${feedbackId}</p>
+                        <p><strong>提议人：</strong>${username}</p>
+                        
+                        <div class="mb-3">
+                            <label for="deletionReason" class="form-label">删除原因（可选）：</label>
+                            <textarea class="form-control" id="deletionReason" rows="3" 
+                                    placeholder="请简要说明删除此提案的原因，此信息将发送给提议人..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-danger" id="confirmDeleteBtn" data-feedback-id="${feedbackId}" data-username="${username}">
+                            <i class="bi bi-trash"></i> 确认删除
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 移除已存在的模态框
+    const existingModal = document.getElementById('deleteConfirmModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // 添加新模态框到页面
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // 显示模态框
+    const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+    modal.show();
+    
+    // 存储按钮引用
+    window.currentDeleteButton = button;
+    
+    // 添加确认删除按钮的事件监听器
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        const feedbackId = this.getAttribute('data-feedback-id');
+         const username = this.getAttribute('data-username');
+         confirmDelete(feedbackId, username);
+     });
+     
+     console.log('Modal created and event listener added successfully');
+    } catch (error) {
+        console.error('Error in showDeleteConfirmModal:', error);
+        showAlert('danger', '显示删除确认对话框时出错: ' + error.message);
+    }
+}
+
+// 确认删除
+function confirmDelete(feedbackId, username) {
+    try {
+        console.log('confirmDelete called with:', feedbackId, username);
+        const reason = document.getElementById('deletionReason').value.trim();
+        const button = window.currentDeleteButton;
+        console.log('Delete reason:', reason, 'Button:', button);
+    
+    if (!button) {
+        showAlert('danger', '操作失败，请重试');
+        return;
+    }
+    
+    const originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+    
+    // 关闭模态框
+    const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+    modal.hide();
+    
+    // 发送删除请求
+    const requestBody = reason ? { reason: reason } : {};
+    
+    fetch(`/api/delete_feedback/${feedbackId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers.get('content-type'));
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return response.json();
+        } else {
+            return response.text().then(text => {
+                console.error('Non-JSON response:', text);
+                throw new Error('服务器返回了非JSON响应');
+            });
+        }
+    })
+    .then(data => {
+        if (data.success) {
+            showAlert('success', data.message);
+            // 从表格中移除该行
+            const row = button.closest('tr');
+            row.style.transition = 'opacity 0.3s';
+            row.style.opacity = '0';
+            setTimeout(() => {
+                row.remove();
+            }, 300);
+        } else {
+            showAlert('danger', data.message);
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', '删除失败，请稍后重试');
+        button.innerHTML = originalHtml;
+        button.disabled = false;
+    });
+    } catch (error) {
+        console.error('Error in confirmDelete:', error);
+        showAlert('danger', '确认删除时出错: ' + error.message);
+        if (window.currentDeleteButton) {
+            window.currentDeleteButton.disabled = false;
+            window.currentDeleteButton.innerHTML = '<i class="bi bi-trash"></i>';
+        }
+    }
 }
 
 // 发送手动邮件提醒

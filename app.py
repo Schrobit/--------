@@ -214,7 +214,12 @@ def admin_panel():
         'SELECT f.*, u.username, u.name FROM feedback f JOIN users u ON f.user_id = u.id WHERE f.status != "已解决" ORDER BY f.created_at DESC'
     ).fetchall()
     
-    # 转换数据格式，处理datetime字段
+    # 获取所有已解决的反馈
+    resolved_feedback_raw = conn.execute(
+        'SELECT f.*, u.username, u.name FROM feedback f JOIN users u ON f.user_id = u.id WHERE f.status = "已解决" ORDER BY f.updated_at DESC'
+    ).fetchall()
+    
+    # 转换待处理反馈数据格式，处理datetime字段
     pending_feedback = []
     for feedback in pending_feedback_raw:
         feedback_dict = dict(feedback)
@@ -231,11 +236,29 @@ def admin_panel():
                 feedback_dict['updated_at'] = datetime.strptime(feedback_dict['updated_at'], '%Y-%m-%d %H:%M:%S')
         pending_feedback.append(feedback_dict)
     
+    # 转换已解决反馈数据格式，处理datetime字段
+    resolved_feedback = []
+    for feedback in resolved_feedback_raw:
+        feedback_dict = dict(feedback)
+        # 将字符串格式的datetime转换为datetime对象
+        if feedback_dict['created_at']:
+            try:
+                feedback_dict['created_at'] = datetime.fromisoformat(feedback_dict['created_at'].replace('Z', '+00:00'))
+            except:
+                feedback_dict['created_at'] = datetime.strptime(feedback_dict['created_at'], '%Y-%m-%d %H:%M:%S')
+        if feedback_dict['updated_at']:
+            try:
+                feedback_dict['updated_at'] = datetime.fromisoformat(feedback_dict['updated_at'].replace('Z', '+00:00'))
+            except:
+                feedback_dict['updated_at'] = datetime.strptime(feedback_dict['updated_at'], '%Y-%m-%d %H:%M:%S')
+        resolved_feedback.append(feedback_dict)
+    
     conn.close()
     
     return render_template('admin.html', 
                          users_status=users_status, 
-                         pending_feedback=pending_feedback)
+                         pending_feedback=pending_feedback,
+                         resolved_feedback=resolved_feedback)
 
 @app.route('/admin/update_feedback', methods=['POST'])
 @login_required
@@ -572,6 +595,115 @@ def clear_old_logs():
     except Exception as e:
         return jsonify({'success': False, 'message': f'清理失败: {str(e)}'})
 
+@app.route('/api/delete_feedback/<feedback_id>', methods=['DELETE'])
+@login_required
+def delete_feedback(feedback_id):
+    """删除提案API - 仅管理员可用"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': '权限不足'})
+    
+    try:
+        conn = get_db_connection()
+        
+        # 首先检查提案是否存在，并获取用户邮箱信息
+        feedback = conn.execute('''
+            SELECT f.*, u.username, u.name, u.email, u.backup_email
+            FROM feedback f
+            JOIN users u ON f.user_id = u.id
+            WHERE f.id = ?
+        ''', (feedback_id,)).fetchone()
+        
+        if not feedback:
+            conn.close()
+            return jsonify({'success': False, 'message': '提案不存在'})
+        
+        # 获取删除原因（可选参数）
+        deletion_reason = request.json.get('reason', '') if request.is_json else ''
+        
+        # 记录操作日志
+        conn.execute('''
+            INSERT INTO operation_logs (feedback_id, operator_id, operation_type, comment, created_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+        ''', (
+            feedback_id,
+            current_user.id,
+            '删除提案',
+            f'管理员删除了用户 {feedback["username"]} 的提案: {feedback["content"][:50]}...'
+        ))
+        
+        # 删除相关的通知日志
+        conn.execute('DELETE FROM notification_logs WHERE feedback_id = ?', (feedback_id,))
+        
+        # 删除提案
+        conn.execute('DELETE FROM feedback WHERE id = ?', (feedback_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        # 发送删除通知邮件
+        try:
+            from email_service import send_deletion_notification_email, get_user_email_for_sending
+            
+            # 获取要发送的邮箱地址（交替使用主邮箱和备份邮箱）
+            target_email = get_user_email_for_sending(feedback['user_id'])
+            if target_email:
+                send_deletion_notification_email(
+                    recipient_email=target_email,
+                    username=feedback['name'] or feedback['username'],
+                    feedback_content=feedback['content'],
+                    admin_name=current_user.name,
+                    deletion_reason=deletion_reason
+                )
+                
+                # 记录邮件发送日志
+                conn = get_db_connection()
+                conn.execute('''
+                    INSERT INTO notification_logs (user_id, feedback_id, email, subject, status, sent_at, error_message)
+                    VALUES (?, ?, ?, ?, ?, datetime('now'), ?)
+                ''', (
+                    feedback['user_id'],
+                    feedback_id,
+                    target_email,
+                    '[通知] 您的提案已被删除',
+                    '成功',
+                    None
+                ))
+                conn.commit()
+                conn.close()
+                
+                print(f"✅ [删除通知] 已向用户 {feedback['username']} 发送删除通知邮件")
+            else:
+                print(f"⚠️ [删除通知] 用户 {feedback['username']} 没有有效邮箱地址")
+                
+        except Exception as email_error:
+            print(f"❌ [删除通知] 发送邮件失败: {str(email_error)}")
+            # 记录邮件发送失败日志
+            try:
+                conn = get_db_connection()
+                conn.execute('''
+                    INSERT INTO notification_logs (user_id, feedback_id, email, notification_type, status, error_message)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    feedback['user_id'],
+                    feedback_id,
+                    feedback['email'],
+                    'delete_notification',
+                    '失败',
+                    str(email_error)
+                ))
+                conn.commit()
+                conn.close()
+            except:
+                pass
+        
+        return jsonify({
+            'success': True, 
+            'message': f'成功删除提案 #{feedback_id}，已通知提议人'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'删除失败: {str(e)}'})
+
 if __name__ == '__main__':
     # 初始化数据库
     init_db()
@@ -588,6 +720,6 @@ if __name__ == '__main__':
     scheduler.start()
     
     try:
-        app.run(debug=True, host='0.0.0.0', port=5001)
+        app.run(debug=True, host='0.0.0.0', port=5008)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
