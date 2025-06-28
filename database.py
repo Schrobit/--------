@@ -94,7 +94,7 @@ def init_db():
     
     # 预置用户数据 (username, password, email, backup_email, name, is_admin)
     users_data = [
-        ('admin', 'admin123', 'admin@ei-power.tech', None, '管理员', True),
+        ('admin', 'tjh123', 'admin@ei-power.tech', None, '管理员', True),
         ('tongjiahao', 'user123', 'tongjiahao@ei-power.tech', 'admin@tjh666.cn', '童佳豪', False),
         ('misa', 'user123', 'misa@ei-power.tech', 'wjhlxynb666@163.com', '吴俊豪', False),
         ('yuanshanzhang', 'user123', 'yuanshanzhang@ei-power.tech', '1447091509@qq.com', '曹彩月', False),
