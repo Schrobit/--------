@@ -52,8 +52,10 @@ def send_deletion_notification_email(recipient_email, username, feedback_content
         
         # 创建邮件对象
         msg = MIMEMultipart()
-        msg['From'] = Header(f'EI Power反馈系统 <{SENDER_EMAIL}>', 'utf-8')
-        msg['To'] = Header(recipient_email, 'utf-8')
+        # 设置From头部，符合RFC5322标准
+        from_name = Header('EI Power反馈系统', 'utf-8').encode()
+        msg['From'] = f'{from_name} <{SENDER_EMAIL}>'
+        msg['To'] = recipient_email
         msg['Subject'] = Header('[通知] 您的提案已被删除', 'utf-8')
         
         # 邮件正文
@@ -107,8 +109,10 @@ def send_reminder_email(recipient_email, username, remaining_count):
         import smtplib
         # 创建邮件对象
         msg = MIMEMultipart()
-        msg['From'] = Header(f'EI Power反馈系统 <{SENDER_EMAIL}>', 'utf-8')
-        msg['To'] = Header(recipient_email, 'utf-8')
+        # 设置From头部，符合RFC5322标准
+        from_name = Header('EI Power反馈系统', 'utf-8').encode()
+        msg['From'] = f'{from_name} <{SENDER_EMAIL}>'
+        msg['To'] = recipient_email
         msg['Subject'] = Header('[行动要求] 今日反馈未提交', 'utf-8')
         
         # 邮件正文
@@ -412,8 +416,10 @@ def send_status_update_notification(feedback_id, old_status, new_status, admin_c
         
         # 创建邮件对象
         msg = MIMEMultipart()
-        msg['From'] = Header(f'EI Power 提案管理系统 <{SENDER_EMAIL}>', 'utf-8')
-        msg['To'] = Header(feedback_info['email'], 'utf-8')
+        # 设置From头部，符合RFC5322标准
+        from_name = Header('EI Power 提案管理系统', 'utf-8').encode()
+        msg['From'] = f'{from_name} <{SENDER_EMAIL}>'
+        msg['To'] = feedback_info['email']
         msg['Subject'] = Header(f'[提案状态更新] 您的提案 #{feedback_id} 状态已更新', 'utf-8')
         
         # 构建邮件正文
