@@ -113,7 +113,7 @@ def dashboard():
 @app.route('/submit_feedback', methods=['GET', 'POST'])
 @login_required
 def submit_feedback():
-    """提交反馈"""
+    """提交问题反馈"""
     if request.method == 'POST':
         today = date.today().strftime('%Y-%m-%d')
         
@@ -125,13 +125,21 @@ def submit_feedback():
         ).fetchone()['count']
         
         if current_count >= 3:
-            flash('今日已提交3个反馈，无法继续提交')
+            flash('今日已提交3个问题，无法继续提交')
             conn.close()
             return redirect(url_for('dashboard'))
         
         content = request.form['content']
+        has_answer = request.form.get('has_answer') == 'on'
+        answer = request.form.get('answer', '').strip() if has_answer else None
+        
         if not content.strip():
-            flash('反馈内容不能为空')
+            flash('问题内容不能为空')
+            conn.close()
+            return render_template('submit_feedback.html')
+        
+        if has_answer and not answer:
+            flash('您选择了有答案，但未填写答案内容')
             conn.close()
             return render_template('submit_feedback.html')
         
@@ -141,13 +149,13 @@ def submit_feedback():
         
         # 插入反馈记录
         conn.execute(
-            'INSERT INTO feedback (id, user_id, content, status, created_at) VALUES (?, ?, ?, ?, ?)',
-            (feedback_id, current_user.id, content, '新提案', datetime.now())
+            'INSERT INTO feedback (id, user_id, content, has_answer, answer, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (feedback_id, current_user.id, content, has_answer, answer, '新问题', datetime.now())
         )
         conn.commit()
         conn.close()
         
-        flash('反馈提交成功')
+        flash('问题提交成功')
         return redirect(url_for('dashboard'))
     
     return render_template('submit_feedback.html')
@@ -196,7 +204,7 @@ def admin_panel():
     # 获取所有用户今日提交状态
     today = date.today().strftime('%Y-%m-%d')
     users_status = conn.execute('''
-        SELECT u.id, u.username, u.email, u.name,
+        SELECT u.id, u.username, u.email, u.backup_email, u.name,
                COALESCE(f.feedback_count, 0) as feedback_count
         FROM users u
         LEFT JOIN (
@@ -263,24 +271,26 @@ def admin_panel():
 @app.route('/admin/update_feedback', methods=['POST'])
 @login_required
 def update_feedback():
-    """管理员更新提案状态"""
+    """管理员更新问题状态"""
     if not current_user.is_admin:
         return jsonify({'error': '权限不足'}), 403
     
-    feedback_id = request.form['feedback_id']
-    status = request.form['status']
+    feedback_id = request.form.get('feedback_id')
+    status = request.form.get('status')
     revised_proposal = request.form.get('revised_proposal', '')
     admin_comment = request.form.get('admin_comment', '')
+    has_answer = 1 if request.form.get('has_answer') else 0
+    answer = request.form.get('answer', '')
     
     conn = get_db_connection()
     
-    # 获取原始提案信息
+    # 获取原始问题信息
     original_feedback = conn.execute(
         'SELECT * FROM feedback WHERE id = ?', (feedback_id,)
     ).fetchone()
     
     if not original_feedback:
-        flash('提案不存在')
+        flash('问题不存在')
         conn.close()
         return redirect(url_for('admin_panel'))
     
@@ -288,24 +298,24 @@ def update_feedback():
     operation_type = '状态更新'
     new_content = original_feedback['content']
     
-    # 如果有修正提案且状态为已解决，则更新提案内容
+    # 如果有修正内容且状态为已解决，则更新问题内容
     if revised_proposal.strip() and status == '已解决':
         new_content = revised_proposal.strip()
-        operation_type = '修正提案'
+        operation_type = '修正问题'
         
-        # 记录修正提案的操作日志
+        # 记录修正问题的操作日志
         conn.execute(
             'INSERT INTO operation_logs (feedback_id, operator_id, operation_type, old_content, new_content, old_status, new_status, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             (feedback_id, current_user.id, operation_type, original_feedback['content'], new_content, original_feedback['status'], status, admin_comment)
         )
         
-        # 更新提案内容和状态
+        # 更新问题内容和状态
         conn.execute(
-            'UPDATE feedback SET content = ?, status = ?, revised_proposal = ?, admin_comment = ?, handler = ?, updated_at = ? WHERE id = ?',
-            (new_content, status, revised_proposal, admin_comment, current_user.name, datetime.now(), feedback_id)
+            'UPDATE feedback SET content = ?, status = ?, revised_proposal = ?, admin_comment = ?, has_answer = ?, answer = ?, handler = ?, updated_at = ? WHERE id = ?',
+            (new_content, status, revised_proposal, admin_comment, has_answer, answer, current_user.name, datetime.now(), feedback_id)
         )
         
-        flash('提案已修正并标记为已解决')
+        flash('问题已修正并标记为已解决')
     else:
         # 只更新状态和意见
         conn.execute(
@@ -314,11 +324,11 @@ def update_feedback():
         )
         
         conn.execute(
-            'UPDATE feedback SET status = ?, revised_proposal = ?, admin_comment = ?, handler = ?, updated_at = ? WHERE id = ?',
-            (status, revised_proposal, admin_comment, current_user.name, datetime.now(), feedback_id)
+            'UPDATE feedback SET status = ?, revised_proposal = ?, admin_comment = ?, has_answer = ?, answer = ?, handler = ?, updated_at = ? WHERE id = ?',
+            (status, revised_proposal, admin_comment, has_answer, answer, current_user.name, datetime.now(), feedback_id)
         )
         
-        flash('提案状态更新成功')
+        flash('问题状态更新成功')
     
     conn.commit()
     conn.close()
@@ -368,12 +378,13 @@ def send_manual_reminder_route():
     
     data = request.get_json()
     target_user = data.get('user_identifier')  # 可以是用户ID或用户名
+    target_email = data.get('target_email')  # 指定的目标邮箱
     
     if not target_user:
         return jsonify({'success': False, 'message': '请提供用户ID或用户名'})
     
     try:
-        result = send_manual_reminder(target_user)
+        result = send_manual_reminder(target_user, target_email)
         if result['success']:
             return jsonify({'success': True, 'message': f'提醒邮件已发送给 {result["username"]}'})
         else:
@@ -384,7 +395,7 @@ def send_manual_reminder_route():
 @app.route('/proposals')
 @login_required
 def all_proposals():
-    """所有提案页面 - 所有人可见"""
+    """所有问题页面 - 所有人可见"""
     conn = get_db_connection()
     
     # 获取筛选参数
@@ -407,7 +418,7 @@ def all_proposals():
     if where_clause:
         where_clause = 'WHERE ' + where_clause
     
-    # 获取所有提案
+    # 获取所有问题
     proposals_raw = conn.execute(f'''
         SELECT f.*, u.username, u.name,
                handler_user.name as handler_name
@@ -439,7 +450,7 @@ def all_proposals():
     stats = conn.execute('''
         SELECT 
             COUNT(*) as total,
-            SUM(CASE WHEN status = '新提案' THEN 1 ELSE 0 END) as new_count,
+            SUM(CASE WHEN status = '新问题' THEN 1 ELSE 0 END) as new_count,
             SUM(CASE WHEN status = '处理中' THEN 1 ELSE 0 END) as processing_count,
             SUM(CASE WHEN status = '已解决' THEN 1 ELSE 0 END) as resolved_count
         FROM feedback
@@ -523,7 +534,7 @@ def resend_notification(feedback_id):
     try:
         conn = get_db_connection()
         
-        # 获取提案信息
+        # 获取问题信息
         feedback = conn.execute('''
             SELECT f.*, u.email, u.name as user_name
             FROM feedback f
@@ -533,7 +544,7 @@ def resend_notification(feedback_id):
         
         if not feedback:
             conn.close()
-            return jsonify({'success': False, 'message': '提案不存在'})
+            return jsonify({'success': False, 'message': '问题不存在'})
         
         # 获取最新的状态更新记录
         latest_log = conn.execute('''
@@ -598,14 +609,14 @@ def clear_old_logs():
 @app.route('/api/delete_feedback/<feedback_id>', methods=['DELETE'])
 @login_required
 def delete_feedback(feedback_id):
-    """删除提案API - 仅管理员可用"""
+    """删除问题API - 仅管理员可用"""
     if not current_user.is_admin:
         return jsonify({'success': False, 'message': '权限不足'})
     
     try:
         conn = get_db_connection()
         
-        # 首先检查提案是否存在，并获取用户邮箱信息
+        # 首先检查问题是否存在，并获取用户邮箱信息
         feedback = conn.execute('''
             SELECT f.*, u.username, u.name, u.email, u.backup_email
             FROM feedback f
@@ -615,7 +626,7 @@ def delete_feedback(feedback_id):
         
         if not feedback:
             conn.close()
-            return jsonify({'success': False, 'message': '提案不存在'})
+            return jsonify({'success': False, 'message': '问题不存在'})
         
         # 获取删除原因（可选参数）
         deletion_reason = request.json.get('reason', '') if request.is_json else ''
@@ -627,14 +638,14 @@ def delete_feedback(feedback_id):
         ''', (
             feedback_id,
             current_user.id,
-            '删除提案',
-            f'管理员删除了用户 {feedback["username"]} 的提案: {feedback["content"][:50]}...'
+            '删除问题',
+            f'管理员删除了用户 {feedback["username"]} 的问题: {feedback["content"][:50]}...'
         ))
         
         # 删除相关的通知日志
         conn.execute('DELETE FROM notification_logs WHERE feedback_id = ?', (feedback_id,))
         
-        # 删除提案
+        # 删除问题
         conn.execute('DELETE FROM feedback WHERE id = ?', (feedback_id,))
         
         conn.commit()
@@ -698,7 +709,7 @@ def delete_feedback(feedback_id):
         
         return jsonify({
             'success': True, 
-            'message': f'成功删除提案 #{feedback_id}，已通知提议人'
+            'message': f'成功删除问题 #{feedback_id}，已通知提议人'
         })
         
     except Exception as e:

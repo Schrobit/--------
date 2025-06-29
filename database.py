@@ -8,10 +8,8 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
-    """初始化数据库"""
-    conn = get_db_connection()
-    
+def create_tables(conn):
+    """创建所有数据库表"""
     # 创建用户表
     conn.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -32,7 +30,9 @@ def init_db():
             id TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL,
             content TEXT NOT NULL,
-            status TEXT DEFAULT '新提案',
+            has_answer BOOLEAN DEFAULT 0,
+            answer TEXT,
+            status TEXT DEFAULT '新问题',
             revised_proposal TEXT,
             admin_comment TEXT,
             handler TEXT,
@@ -91,58 +91,62 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     ''')
-    
+
+def insert_initial_users(conn):
+    """插入初始用户数据"""
     # 预置用户数据 (username, password, email, backup_email, name, is_admin)
     users_data = [
         ('admin', 'tjh123', 'admin@ei-power.tech', None, '管理员', True),
-        ('tongjiahao', 'user123', 'tongjiahao@ei-power.tech', 'admin@tjh666.cn', '童佳豪', False),
-        ('misa', 'user123', 'misa@ei-power.tech', 'wjhlxynb666@163.com', '吴俊豪', False),
-        ('yuanshanzhang', 'user123', 'yuanshanzhang@ei-power.tech', '1447091509@qq.com', '曹彩月', False),
-        ('noname', 'user123', 'noname@ei-power.tech', '1473886876@qq.com', '叶邱静怡', False),
-        ('iiio', 'user123', 'iiio@ei-power.tech', '2174874621@qq.com', '陈佳欣', False),
-        ('wuyigexiaolingcheng', 'user123', 'wuyigexiaolingcheng@ei-power.tech', '3512059073@qq.com', '张彤', False),
-        ('xiaoyuaishuijiao', 'user123', 'xiaoyuaishuijiao@ei-power.tech', '2563442458@qq.com', '王星月', False),
-        ('chuaner', 'user123', 'chuaner@ei-power.tech', '807597677@qq.com', '倪杨钊', False),
-        ('sandishousibushousi', 'user123', 'sandishousibushousi@ei-power.tech', '3151247853@qq.com', '徐茹雯', False),
-        ('xiaoxue', 'user123', 'xiaoxue@ei-power.tech', '2757186656@qq.com', '姜赐雪', False)
+        ('tongjiahao', '@ei-power.tech', 'tongjiahao@ei-power.tech', 'admin@tjh666.cn', '童佳豪', False),
+        ('wujunhao', '@ei-power.tech', 'misa@ei-power.tech', 'wjhlxynb666@163.com', '吴俊豪', False),
+        ('caocaiyue', '@ei-power.tech', 'yuanshanzhang@ei-power.tech', '1447091509@qq.com', '曹彩月', False),
+        ('yeqiujingyi', '@ei-power.tech', 'noname@ei-power.tech', '1473886876@qq.com', '叶邱静怡', False),
+        ('chenjiaxin', '@ei-power.tech', 'chenjiaxin@ei-power.tech', '2174874621@qq.com', '陈佳欣', False),
+        ('zhangtong', '@ei-power.tech', 'wuyigexiaolingcheng@ei-power.tech', '3512059073@qq.com', '张彤', False),
+        ('wangxingyue', '@ei-power.tech', 'xiaoyuaishuijiao@ei-power.tech', '2563442458@qq.com', '王星月', False),
+        ('niyangzhao', '@ei-power.tech', 'chuaner@ei-power.tech', '807597677@qq.com', '倪杨钊', False),
+        ('xuruwen', '@ei-power.tech', 'sandishousibushousi@ei-power.tech', '3151247853@qq.com', '徐茹雯', False),
+        ('jiangcixue', '@ei-power.tech', 'xiaoxue@ei-power.tech', '2757186656@qq.com', '姜赐雪', False)
     ]
-    
-    # 首先检查是否需要添加name字段
-    try:
-        conn.execute('SELECT name FROM users LIMIT 1')
-    except sqlite3.OperationalError:
-        # name字段不存在，添加该字段
-        conn.execute('ALTER TABLE users ADD COLUMN name TEXT')
-        print("已添加name字段到users表")
-    
-    # 检查是否需要添加backup_email字段
-    try:
-        conn.execute('SELECT backup_email FROM users LIMIT 1')
-    except sqlite3.OperationalError:
-        # backup_email字段不存在，添加该字段
-        conn.execute('ALTER TABLE users ADD COLUMN backup_email TEXT')
-        print("已添加backup_email字段到users表")
     
     for username, password, email, backup_email, name, is_admin in users_data:
         # 检查用户是否已存在
         existing_user = conn.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
         if not existing_user:
-            # 使用提供的密码
+            # 生成密码哈希
             password_hash = generate_password_hash(password)
             conn.execute(
                 'INSERT INTO users (username, password, email, backup_email, name, is_admin) VALUES (?, ?, ?, ?, ?, ?)',
                 (username, password_hash, email, backup_email, name, is_admin)
             )
+            print(f"已创建用户: {name} ({username})")
         else:
-            # 更新现有用户的中文姓名和备份邮箱
-            conn.execute(
-                'UPDATE users SET name = ?, backup_email = ? WHERE username = ?',
-                (name, backup_email, username)
-            )
+            print(f"用户已存在: {name} ({username})")
+
+def init_db():
+    """初始化数据库"""
+    print("开始初始化数据库...")
     
-    conn.commit()
-    conn.close()
-    print("数据库初始化完成")
+    conn = get_db_connection()
+    
+    try:
+        # 创建所有表
+        create_tables(conn)
+        print("数据库表创建完成")
+        
+        # 插入初始用户数据
+        insert_initial_users(conn)
+        
+        # 提交事务
+        conn.commit()
+        print("数据库初始化完成")
+        
+    except Exception as e:
+        print(f"数据库初始化失败: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 if __name__ == '__main__':
     init_db()

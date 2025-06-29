@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}历史记录 - EI Power反馈管理系统{% endblock %}
+{% block title %}历史记录 - EI Power问题管理系统{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2><i class="bi bi-clock-history"></i> 历史提案记录</h2>
+            <h2><i class="bi bi-clock-history"></i> 历史问题记录</h2>
             <a href="{{ url_for('submit_feedback') }}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> 新增提案
+                <i class="bi bi-plus-circle"></i> 新增问题
             </a>
         </div>
     </div>
@@ -21,15 +21,15 @@
         <div class="card border-0 shadow-sm text-center">
             <div class="card-body">
                 <h3 class="text-primary">{{ feedback_list|length }}</h3>
-                <small class="text-muted">总提案数</small>
+                <small class="text-muted">总问题数</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card border-0 shadow-sm text-center">
             <div class="card-body">
-                <h3 class="text-warning">{{ feedback_list|selectattr('status', 'equalto', '新提案')|list|length }}</h3>
-                <small class="text-muted">新提案</small>
+                <h3 class="text-warning">{{ feedback_list|selectattr('status', 'equalto', '新问题')|list|length }}</h3>
+                <small class="text-muted">新问题</small>
             </div>
         </div>
     </div>
@@ -58,11 +58,11 @@
             <div class="card-header bg-white">
                 <div class="row align-items-center">
                     <div class="col-md-6">
-                        <h5 class="mb-0">提案记录列表</h5>
+                        <h5 class="mb-0">问题记录列表</h5>
                     </div>
                     <div class="col-md-6">
                         <div class="input-group">
-                            <input type="text" class="form-control" id="search-input" placeholder="搜索提案内容...">
+                            <input type="text" class="form-control" id="search-input" placeholder="搜索问题内容...">
                             <button class="btn btn-outline-secondary" type="button" id="search-btn">
                                 <i class="bi bi-search"></i>
                             </button>
@@ -76,7 +76,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th style="width: 15%;">编号</th>
-                                <th style="width: 40%;">提案内容</th>
+                                <th style="width: 40%;">问题内容</th>
                                 <th style="width: 10%;">状态</th>
                                 <th style="width: 15%;">提交时间</th>
                                 <th style="width: 20%;">操作</th>
@@ -96,7 +96,7 @@
                                     </div>
                                 </td>
                                 <td>
-                                    {% if feedback.status == '新提案' %}
+                                    {% if feedback.status == '新问题' %}
                                         <span class="badge bg-primary">{{ feedback.status }}</span>
                                     {% elif feedback.status == '处理中' %}
                                         <span class="badge bg-warning">{{ feedback.status }}</span>
@@ -117,6 +117,8 @@
                                             data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                             data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                             data-handler="{{ feedback.handler or '' }}"
+                                            data-has-answer="{{ feedback.has_answer or false }}"
+                                            data-answer="{{ (feedback.answer or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                             data-created="{{ feedback.created_at.strftime('%Y-%m-%d %H:%M') if feedback.created_at else '' }}"
                                             data-updated="{{ feedback.updated_at.strftime('%Y-%m-%d %H:%M') if feedback.updated_at else '' }}"
                                             onclick="showFeedbackDetailFromData(this)">
@@ -140,10 +142,10 @@
         <div class="card border-0 shadow-sm">
             <div class="card-body text-center py-5">
                 <i class="bi bi-inbox display-1 text-muted"></i>
-                <h4 class="text-muted mt-3">暂无提案记录</h4>
-                <p class="text-muted">您还没有提交过任何提案，开始提交您的第一个提案吧！</p>
+                <h4 class="text-muted mt-3">暂无问题记录</h4>
+                <p class="text-muted">您还没有提交过任何问题，开始提交您的第一个问题吧！</p>
                 <a href="{{ url_for('submit_feedback') }}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> 立即提交提案
+                    <i class="bi bi-plus-circle"></i> 立即提交问题
                 </a>
             </div>
         </div>
@@ -156,7 +158,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-file-text"></i> 提案详情</h5>
+                <h5 class="modal-title"><i class="bi bi-file-text"></i> 问题详情</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -172,12 +174,17 @@
                 </div>
                 
                 <div class="mb-3">
-                    <strong>提案内容：</strong>
+                    <strong>问题内容：</strong>
                     <div class="bg-light p-3 rounded mt-2" id="detail-content"></div>
                 </div>
                 
+                <div class="mb-3" id="answer-section" style="display: none;">
+                    <strong>提交者的答案/解决方案：</strong>
+                    <div class="bg-primary bg-opacity-10 p-3 rounded mt-2" id="detail-answer"></div>
+                </div>
+                
                 <div class="mb-3" id="revised-proposal-section" style="display: none;">
-                    <strong>修正提案：</strong>
+                    <strong>修正问题：</strong>
                     <div class="bg-info bg-opacity-10 p-3 rounded mt-2" id="detail-revised-proposal"></div>
                 </div>
                 
@@ -244,23 +251,32 @@ searchInput.addEventListener('keypress', function(e) {
     }
 });
 
-// 显示提案详情
-function showFeedbackDetail(id, content, status, revisedProposal, adminComment, handler, createdAt, updatedAt) {
+// 显示问题详情
+function showFeedbackDetail(id, content, status, revisedProposal, adminComment, handler, hasAnswer, answer, createdAt, updatedAt) {
     document.getElementById('detail-id').textContent = id;
     document.getElementById('detail-content').textContent = content;
     document.getElementById('detail-created-at').textContent = createdAt;
     
     // 状态徽章
     const statusBadge = document.getElementById('detail-status-badge');
-    if (status === '新提案') {
-        statusBadge.innerHTML = '<span class="badge bg-primary">新提案</span>';
+    if (status === '新问题') {
+        statusBadge.innerHTML = '<span class="badge bg-primary">新问题</span>';
     } else if (status === '处理中') {
         statusBadge.innerHTML = '<span class="badge bg-warning">处理中</span>';
     } else if (status === '已解决') {
         statusBadge.innerHTML = '<span class="badge bg-success">已解决</span>';
     }
     
-    // 修正提案
+    // 答案/解决方案
+    const answerSection = document.getElementById('answer-section');
+    if (hasAnswer === 'True' && answer && answer.trim()) {
+        document.getElementById('detail-answer').textContent = answer;
+        answerSection.style.display = 'block';
+    } else {
+        answerSection.style.display = 'none';
+    }
+    
+    // 修正问题
     const revisedSection = document.getElementById('revised-proposal-section');
     if (revisedProposal && revisedProposal.trim()) {
         document.getElementById('detail-revised-proposal').textContent = revisedProposal;
@@ -301,7 +317,7 @@ function showFeedbackDetail(id, content, status, revisedProposal, adminComment, 
     modal.show();
 }
 
-// 从按钮数据属性显示提案详情
+// 从按钮数据属性显示问题详情
 function showFeedbackDetailFromData(button) {
     var id = button.getAttribute('data-id');
     var content = button.getAttribute('data-content');
@@ -309,10 +325,12 @@ function showFeedbackDetailFromData(button) {
     var revised = button.getAttribute('data-revised');
     var comment = button.getAttribute('data-comment');
     var handler = button.getAttribute('data-handler');
+    var hasAnswer = button.getAttribute('data-has-answer');
+    var answer = button.getAttribute('data-answer');
     var created = button.getAttribute('data-created');
     var updated = button.getAttribute('data-updated');
     
-    showFeedbackDetail(id, content, status, revised, comment, handler, created, updated);
+    showFeedbackDetail(id, content, status, revised, comment, handler, hasAnswer, answer, created, updated);
 }
 </script>
 {% endblock %}

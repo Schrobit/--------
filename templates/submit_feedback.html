@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}提交提案 - EI Power提案管理系统{% endblock %}
+{% block title %}提交问题 - EI Power提案管理系统{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-plus-circle"></i> 提交提案</h4>
+                <h4 class="mb-0"><i class="bi bi-plus-circle"></i> 提交问题</h4>
             </div>
             <div class="card-body">
                 <!-- 今日提交状态提示 -->
@@ -15,7 +15,7 @@
                     <div class="row align-items-center">
                         <div class="col-md-8">
                             <h6><i class="bi bi-info-circle"></i> 今日提交状态</h6>
-                            <p class="mb-0">您今天已提交 <strong id="current-count">0</strong> 个提案，还需提交 <strong id="remaining-count">3</strong> 个</p>
+                            <p class="mb-0">您今天已提交 <strong id="current-count">0</strong> 个问题，还需提交 <strong id="remaining-count">3</strong> 个</p>
                         </div>
                         <div class="col-md-4 text-end">
                             <div class="progress" style="height: 20px;">
@@ -30,7 +30,7 @@
                 <form method="POST" id="feedback-form">
                     <div class="mb-4">
                         <label for="content" class="form-label">
-                            <i class="bi bi-chat-text"></i> 提案内容 <span class="text-danger">*</span>
+                            <i class="bi bi-chat-text"></i> 问题内容 <span class="text-danger">*</span>
                         </label>
                         <textarea class="form-control" id="content" name="content" rows="6" 
                                 placeholder="请详细描述您遇到的问题、建议或意见..." 
@@ -40,13 +40,35 @@
                         </div>
                     </div>
                     
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="has_answer" name="has_answer" onchange="toggleAnswerField()" checked>
+                            <label class="form-check-label" for="has_answer">
+                                <i class="bi bi-lightbulb"></i> 我有答案或解决方案
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4" id="answer_field" style="display: block;">
+                        <label for="answer" class="form-label">
+                            <i class="bi bi-check-circle"></i> 您的答案或解决方案
+                        </label>
+                        <textarea class="form-control" id="answer" name="answer" rows="4" 
+                                placeholder="请详细描述您的答案或解决方案..." 
+                                maxlength="1000"></textarea>
+                        <div class="form-text">
+                            <span class="text-muted">还可输入 <span id="answer-char-count">1000</span> 个字符</span>
+                        </div>
+                    </div>
+                    
                     <!-- 提交指南 -->
                     <div class="alert alert-light border" role="alert">
-                        <h6><i class="bi bi-lightbulb"></i> 提案提交指南</h6>
+                        <h6><i class="bi bi-lightbulb"></i> 问题提交指南</h6>
                         <ul class="mb-0 small">
-                            <li>请确保提案内容具体、清晰，便于管理员理解和处理</li>
+                            <li>请确保问题内容具体、清晰，便于管理员理解和处理</li>
                             <li>可以包含问题描述、改进建议、功能需求等</li>
-                            <li>每个提案将自动生成唯一编号，便于跟踪处理进度</li>
+                            <li>如果您有答案或解决方案，请勾选相应选项并填写</li>
+                            <li>每个问题将自动生成唯一编号，便于跟踪处理进度</li>
                             <li>提交后可在历史记录中查看处理状态</li>
                         </ul>
                     </div>
@@ -56,22 +78,22 @@
                             <i class="bi bi-arrow-left"></i> 返回仪表盘
                         </a>
                         <button type="submit" class="btn btn-primary" id="submit-btn">
-                            <i class="bi bi-send"></i> 提交提案
+                            <i class="bi bi-send"></i> 提交问题
                         </button>
                     </div>
                 </form>
             </div>
         </div>
         
-        <!-- 提案模板示例 -->
+        <!-- 问题模板示例 -->
         <div class="card border-0 shadow-sm mt-4">
             <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-file-text"></i> 提案模板参考</h6>
+                <h6 class="mb-0"><i class="bi bi-file-text"></i> 问题模板参考</h6>
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-4">
-                        <h6 class="text-primary">问题提案</h6>
+                        <h6 class="text-primary">问题反馈</h6>
                         <div class="bg-light p-3 rounded small">
                             <strong>问题描述：</strong>登录页面在移动端显示异常<br>
                             <strong>重现步骤：</strong>使用手机浏览器访问登录页<br>
@@ -106,6 +128,8 @@
 // 字符计数功能
 const contentTextarea = document.getElementById('content');
 const charCountSpan = document.getElementById('char-count');
+const answerTextarea = document.getElementById('answer');
+const answerCharCountSpan = document.getElementById('answer-char-count');
 const maxLength = 1000;
 
 contentTextarea.addEventListener('input', function() {
@@ -121,6 +145,36 @@ contentTextarea.addEventListener('input', function() {
         charCountSpan.className = 'text-muted';
     }
 });
+
+answerTextarea.addEventListener('input', function() {
+    const currentLength = this.value.length;
+    const remaining = maxLength - currentLength;
+    answerCharCountSpan.textContent = remaining;
+    
+    if (remaining < 100) {
+        answerCharCountSpan.className = 'text-warning';
+    } else if (remaining < 50) {
+        answerCharCountSpan.className = 'text-danger';
+    } else {
+        answerCharCountSpan.className = 'text-muted';
+    }
+});
+
+// 切换答案字段显示
+function toggleAnswerField() {
+    const checkbox = document.getElementById('has_answer');
+    const answerField = document.getElementById('answer_field');
+    const answerTextarea = document.getElementById('answer');
+    
+    if (checkbox.checked) {
+        answerField.style.display = 'block';
+        answerTextarea.required = false; // 不强制要求填写答案
+    } else {
+        answerField.style.display = 'none';
+        answerTextarea.required = false;
+        answerTextarea.value = '';
+    }
+}
 
 // 获取当前提交状态
 fetch('/api/today_status')
@@ -141,11 +195,13 @@ fetch('/api/today_status')
                 document.getElementById('submit-btn').disabled = true;
                 document.getElementById('submit-btn').innerHTML = '<i class="bi bi-check-circle"></i> 今日已完成';
                 document.getElementById('content').disabled = true;
+                document.getElementById('answer').disabled = true;
+                document.getElementById('has_answer').disabled = true;
                 
                 // 显示完成提示
                 const alertDiv = document.createElement('div');
                 alertDiv.className = 'alert alert-success border-0';
-                alertDiv.innerHTML = '<i class="bi bi-check-circle"></i> 您今日的提案提交任务已完成，感谢您的参与！';
+                alertDiv.innerHTML = '<i class="bi bi-check-circle"></i> 您今日的问题提交任务已完成，感谢您的参与！';
                 document.querySelector('.card-body').insertBefore(alertDiv, document.querySelector('form'));
             }
         }
@@ -159,12 +215,12 @@ document.getElementById('feedback-form').addEventListener('submit', function(e) 
     const content = document.getElementById('content').value.trim();
     if (content.length < 10) {
         e.preventDefault();
-        alert('提案内容至少需要10个字符，请提供更详细的描述。');
+        alert('问题内容至少需要10个字符，请提供更详细的描述。');
         return false;
     }
     
     // 提交确认
-    if (!confirm('确认提交此提案吗？提交后将无法修改。')) {
+    if (!confirm('确认提交此问题吗？提交后将无法修改。')) {
         e.preventDefault();
         return false;
     }

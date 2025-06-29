@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}仪表盘 - EI Power提案管理系统{% endblock %}
+{% block title %}仪表盘 - EI Power问题管理系统{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -43,16 +43,17 @@
             <div class="card-body">
                 <h5 class="card-title"><i class="bi bi-calendar-check"></i> 今日任务</h5>
                 <div class="progress mb-3" style="height: 20px;">
+                    {% set progress_percent = (feedback_count / 3 * 100)|round %}
                     <div class="progress-bar {% if feedback_count >= 3 %}bg-success{% else %}bg-warning{% endif %}" 
                          role="progressbar" 
-                         style="width: {{ (feedback_count / 3 * 100)|round }}%;">
-                        {{ (feedback_count / 3 * 100)|round }}%
+                         style="width: {{ progress_percent }}%;">
+                        {{ progress_percent }}%
                     </div>
                 </div>
                 
                 {% if feedback_count < 3 %}
                     <a href="{{ url_for('submit_feedback') }}" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> 提交提案
+                        <i class="bi bi-plus-circle"></i> 提交问题
                     </a>
                 {% else %}
                     <button class="btn btn-success" disabled>
@@ -64,15 +65,15 @@
     </div>
 </div>
 
-<!-- 最近提案记录 -->
+<!-- 最近问题记录 -->
 <div class="row">
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> 最近提案记录</h5>
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> 最近问题记录</h5>
                     <a href="{{ url_for('history') }}" class="btn btn-outline-primary btn-sm">
-                        查看全部 <i class="bi bi-arrow-right"></i>
+                        <i class="bi bi-list-ul"></i> 查看全部
                     </a>
                 </div>
             </div>
@@ -82,23 +83,25 @@
                         <table class="table table-hover">
                             <thead class="table-light">
                                 <tr>
-                                    <th>编号</th>
-                                    <th>内容</th>
-                                    <th>状态</th>
-                                    <th>提交时间</th>
+                                    <th style="width: 15%;">编号</th>
+                                    <th style="width: 45%;">内容</th>
+                                    <th style="width: 15%;">状态</th>
+                                    <th style="width: 25%;">提交时间</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for feedback in recent_feedback %}
                                 <tr>
-                                    <td><code>{{ feedback.id }}</code></td>
+                                    <td>
+                                        <code class="small">#{{ feedback.id }}</code>
+                                    </td>
                                     <td>
                                         <div class="text-truncate" style="max-width: 300px;" title="{{ feedback.content }}">
                                             {{ feedback.content }}
                                         </div>
                                     </td>
                                     <td>
-                                        {% if feedback.status == '新提案' %}
+                                        {% if feedback.status == '新问题' %}
                                             <span class="badge bg-primary status-badge">{{ feedback.status }}</span>
                                         {% elif feedback.status == '处理中' %}
                                             <span class="badge bg-warning status-badge">{{ feedback.status }}</span>
@@ -119,10 +122,10 @@
                 {% else %}
                     <div class="text-center py-4">
                         <i class="bi bi-inbox display-1 text-muted"></i>
-                        <h5 class="text-muted mt-3">暂无提案记录</h5>
-                        <p class="text-muted">开始提交您的第一个提案吧！</p>
+                        <h5 class="text-muted mt-3">暂无记录</h5>
+                        <p class="text-muted">您还没有提交过任何问题</p>
                         <a href="{{ url_for('submit_feedback') }}" class="btn btn-primary">
-                            <i class="bi bi-plus-circle"></i> 立即提交
+                            <i class="bi bi-plus-circle"></i> 立即提交问题
                         </a>
                     </div>
                 {% endif %}
@@ -134,17 +137,45 @@
 <!-- 使用提示 -->
 <div class="row mt-4">
     <div class="col-12">
-        <div class="alert alert-info border-0" role="alert">
-            <h6><i class="bi bi-lightbulb"></i> 使用提示</h6>
+        <div class="alert alert-info border-0">
+            <h6><i class="bi bi-info-circle"></i> 使用提示</h6>
             <ul class="mb-0">
-                <li>每天需要提交 <strong>3个问题提案</strong></li>
-                <li>系统将在每日 <strong>16:00</strong> 自动提醒未完成提交的成员</li>
-                <li>管理员会及时处理您的提案并给出回复</li>
-                <li>您可以在历史记录中查看提案的处理状态</li>
+                <li>每日需要提交至少3个问题</li>
+                <li>可以在历史记录中查看所有提交的问题</li>
+                <li>管理员会及时处理您的问题并给出反馈</li>
+                <li>您可以随时查看问题的处理状态</li>
             </ul>
         </div>
     </div>
 </div>
+
+<style>
+.status-badge {
+    font-size: 0.75rem;
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #495057;
+}
+
+.display-4 {
+    font-weight: 700;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}

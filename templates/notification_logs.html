@@ -74,7 +74,7 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <input type="text" class="form-control" id="searchInput" placeholder="搜索用户邮箱或提案ID..." onkeyup="filterLogs()">
+                            <input type="text" class="form-control" id="searchInput" placeholder="搜索用户邮箱或问题ID..." onkeyup="filterLogs()">
                         </div>
                         <div class="col-md-2">
                             <input type="date" class="form-control" id="dateFilter" onchange="filterLogs()">
@@ -87,7 +87,7 @@
                             <thead class="table-dark">
                                 <tr>
                                     <th>ID</th>
-                                    <th>提案ID</th>
+                                    <th>问题ID</th>
                                     <th>用户邮箱</th>
                                     <th>通知类型</th>
                                     <th>状态变更</th>
@@ -155,7 +155,7 @@
                     <div class="text-center py-5">
                         <i class="bi bi-inbox display-1 text-muted"></i>
                         <h5 class="text-muted mt-3">暂无通知日志</h5>
-                        <p class="text-muted">当有提案状态更新时，系统会自动发送通知邮件</p>
+                        <p class="text-muted">当有问题状态更新时，系统会自动发送通知邮件</p>
                     </div>
                     {% endif %}
                 </div>
@@ -235,7 +235,7 @@ function showLogDetail(logId) {
                     <div class="row">
                         <div class="col-md-6">
                             <strong>通知ID:</strong> ${log.id}<br>
-                            <strong>提案ID:</strong> #${log.feedback_id}<br>
+                            <strong>问题ID:</strong> #${log.feedback_id}<br>
                             <strong>用户邮箱:</strong> ${log.email}<br>
                             <strong>通知类型:</strong> ${log.notification_type}<br>
                         </div>
@@ -324,9 +324,9 @@ function clearOldLogs() {
     }
 }
 
-// 显示提案详情
+// 显示问题详情
 function showFeedbackDetail(feedbackId) {
-    // 这里可以跳转到提案详情页面或显示模态框
+    // 这里可以跳转到问题详情页面或显示模态框
     window.open(`/proposals?search=${feedbackId}`, '_blank');
 }
 

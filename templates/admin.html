@@ -1,7 +1,7 @@
 <!-- Jinja2 Template File -->
 {% extends "base.html" %}
 
-{% block title %}管理面板 - EI Power提案管理系统{% endblock %}
+{% block title %}管理面板 - EI Power问题管理系统{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -29,7 +29,10 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         <h6 class="mb-1">{{ user.name }}</h6>
-                                        <small class="text-muted">{{ user.email }}</small>
+                                        <small class="text-muted">主邮箱: {{ user.email }}</small>
+                                        {% if user.backup_email %}
+                                        <br><small class="text-muted">备用邮箱: {{ user.backup_email }}</small>
+                                        {% endif %}
                                     </div>
                                     <div class="text-end">
                                         <h4 class="mb-0 {% if user.feedback_count >= 3 %}text-success{% elif user.feedback_count > 0 %}text-warning{% else %}text-danger{% endif %}">
@@ -43,18 +46,31 @@
                                             <span class="badge bg-danger">未开始</span>
                                         {% endif %}
                                         <br>
-                                        <button class="btn btn-outline-primary btn-sm mt-1" 
-                                                onclick="sendManualReminder('{{ user.username }}')" 
-                                                title="发送邮件提醒">
-                                            <i class="bi bi-envelope"></i>
-                                        </button>
+                                        <div class="btn-group mt-1" role="group">
+                                            <button class="btn btn-outline-primary btn-sm" 
+                                                    onclick="sendManualReminder('{{ user.username }}', 'auto')" 
+                                                    title="自动选择邮箱发送">
+                                                <i class="bi bi-envelope"></i>
+                                            </button>
+                                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle dropdown-toggle-split" 
+                                                    data-bs-toggle="dropdown" 
+                                                    title="选择邮箱发送">
+                                                <span class="visually-hidden">选择邮箱</span>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="#" onclick="sendManualReminder('{{ user.username }}', '{{ user.email }}')">发送到主邮箱<br><small class="text-muted">{{ user.email }}</small></a></li>
+                                                {% if user.backup_email %}
+                                                <li><a class="dropdown-item" href="#" onclick="sendManualReminder('{{ user.username }}', '{{ user.backup_email }}')">发送到备用邮箱<br><small class="text-muted">{{ user.backup_email }}</small></a></li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
                                 {% set progress_class = 'bg-success' if user.feedback_count >= 3 else ('bg-warning' if user.feedback_count > 0 else 'bg-danger') %}
-                                {% set progress_width = (user.feedback_count / 3 * 100)|round %}
+                                {% set progress_percent = (user.feedback_count / 3 * 100)|round %}
                                 <div class="progress mt-2" style="height: 8px;">
                                     <div class="progress-bar {{ progress_class }}" 
-                                         style="width: {{ progress_width }}%"></div>
+                                         style="width: {{ progress_percent }}%"></div>
                                 </div>
                             </div>
                         </div>
@@ -66,25 +82,25 @@
     </div>
 </div>
 
-<!-- 提案管理 -->
+<!-- 问题管理 -->
 <div class="row">
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-list-task"></i> 提案管理</h5>
+                <h5 class="mb-0"><i class="bi bi-list-task"></i> 问题管理</h5>
             </div>
             <div class="card-body">
                 <!-- 选项卡导航 -->
                 <ul class="nav nav-tabs mb-3" id="feedbackTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
-                            <i class="bi bi-clock"></i> 待处理提案 
+                            <i class="bi bi-clock"></i> 待处理问题 
                             <span class="badge bg-primary ms-1">{{ pending_feedback|length }}</span>
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="resolved-tab" data-bs-toggle="tab" data-bs-target="#resolved" type="button" role="tab">
-                            <i class="bi bi-check-circle"></i> 已解决提案 
+                            <i class="bi bi-check-circle"></i> 已解决问题 
                             <span class="badge bg-success ms-1">{{ resolved_feedback|length }}</span>
                         </button>
                     </li>
@@ -92,16 +108,16 @@
                 
                 <!-- 选项卡内容 -->
                 <div class="tab-content" id="feedbackTabContent">
-                    <!-- 待处理提案选项卡 -->
+                    <!-- 待处理问题选项卡 -->
                     <div class="tab-pane fade show active" id="pending" role="tabpanel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">待处理提案列表</h6>
+                            <h6 class="mb-0">待处理问题列表</h6>
                             <div>
                                 <button class="btn btn-outline-primary btn-sm" onclick="filterFeedback('all')">
                                     全部 ({{ pending_feedback|length }})
                                 </button>
-                                <button class="btn btn-outline-warning btn-sm" onclick="filterFeedback('新提案')">
-                                    新提案 ({{ pending_feedback|selectattr('status', 'equalto', '新提案')|list|length }})
+                                <button class="btn btn-outline-warning btn-sm" onclick="filterFeedback('新问题')">
+                                    新问题 ({{ pending_feedback|selectattr('status', 'equalto', '新问题')|list|length }})
                                 </button>
                                 <button class="btn btn-outline-info btn-sm" onclick="filterFeedback('处理中')">
                                     处理中 ({{ pending_feedback|selectattr('status', 'equalto', '处理中')|list|length }})
@@ -115,7 +131,7 @@
                                         <tr>
                                             <th style="width: 12%;">编号</th>
                                             <th style="width: 10%;">提议人</th>
-                                            <th style="width: 30%;">提案内容</th>
+                                            <th style="width: 30%;">问题内容</th>
                                             <th style="width: 8%;">状态</th>
                                             <th style="width: 12%;">提交时间</th>
                                             <th style="width: 28%;">操作</th>
@@ -135,7 +151,7 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                {% if feedback.status == '新提案' %}
+                                                {% if feedback.status == '新问题' %}
                                                     <span class="badge bg-primary">{{ feedback.status }}</span>
                                                 {% elif feedback.status == '处理中' %}
                                                     <span class="badge bg-warning">{{ feedback.status }}</span>
@@ -155,6 +171,8 @@
                                                         data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         data-handler="{{ feedback.handler or '' }}"
+                                                        data-has-answer="{{ feedback.has_answer or 0 }}"
+                                                        data-answer="{{ (feedback.answer or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         onclick="viewFeedbackFromData(this)"
                                                         title="查看详情">
                                                     <i class="bi bi-eye"></i>
@@ -164,15 +182,17 @@
                                                         data-status="{{ feedback.status }}"
                                                         data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                        data-has-answer="{{ feedback.has_answer or 0 }}"
+                                                        data-answer="{{ (feedback.answer or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         onclick="editFeedbackFromData(this)"
-                                                        title="编辑提案">
+                                                        title="编辑问题">
                                                     <i class="bi bi-pencil"></i>
                                                 </button>
                                                 <button class="btn btn-outline-danger btn-sm" 
                                                         data-id="{{ feedback.id }}"
                                                         data-username="{{ feedback.username|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         onclick="deleteFeedback(this)"
-                                                        title="删除提案">
+                                                        title="删除问题">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             </td>
@@ -184,17 +204,17 @@
                         {% else %}
                             <div class="text-center py-4">
                                 <i class="bi bi-check-circle display-1 text-success"></i>
-                                <h5 class="text-muted mt-3">所有提案已处理完成</h5>
-                                <p class="text-muted">当前没有待处理的提案</p>
+                                <h5 class="text-muted mt-3">所有问题已处理完成</h5>
+                    <p class="text-muted">当前没有待处理的问题</p>
                             </div>
                         {% endif %}
                     </div>
                     
-                    <!-- 已解决提案选项卡 -->
+                    <!-- 已解决问题选项卡 -->
                     <div class="tab-pane fade" id="resolved" role="tabpanel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">已解决提案列表</h6>
-                            <span class="text-muted">共 {{ resolved_feedback|length }} 个已解决提案</span>
+                            <h6 class="mb-0">已解决问题列表</h6>
+                            <span class="text-muted">共 {{ resolved_feedback|length }} 个已解决问题</span>
                         </div>
                         
                         {% if resolved_feedback %}
@@ -204,7 +224,7 @@
                                         <tr>
                                             <th style="width: 12%;">编号</th>
                                             <th style="width: 10%;">提议人</th>
-                                            <th style="width: 30%;">提案内容</th>
+                                            <th style="width: 30%;">问题内容</th>
                                             <th style="width: 8%;">状态</th>
                                             <th style="width: 12%;">解决时间</th>
                                             <th style="width: 28%;">操作</th>
@@ -240,6 +260,8 @@
                                                         data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         data-handler="{{ feedback.handler or '' }}"
+                                                        data-has-answer="{{ feedback.has_answer or 0 }}"
+                                                        data-answer="{{ (feedback.answer or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         onclick="viewFeedbackFromData(this)"
                                                         title="查看详情">
                                                     <i class="bi bi-eye"></i>
@@ -248,7 +270,7 @@
                                                         data-id="{{ feedback.id }}"
                                                         data-username="{{ feedback.username|replace('"', '&quot;')|replace("'", "&#39;") }}"
                                                         onclick="deleteFeedback(this)"
-                                                        title="删除提案">
+                                                        title="删除问题">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             </td>
@@ -260,8 +282,8 @@
                         {% else %}
                             <div class="text-center py-4">
                                 <i class="bi bi-archive display-1 text-muted"></i>
-                                <h5 class="text-muted mt-3">暂无已解决提案</h5>
-                                <p class="text-muted">已解决的提案将显示在这里</p>
+                                <h5 class="text-muted mt-3">暂无已解决问题</h5>
+                    <p class="text-muted">已解决的问题将显示在这里</p>
                             </div>
                         {% endif %}
                     </div>
@@ -276,7 +298,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-file-text"></i> 提案详情</h5>
+                <h5 class="modal-title"><i class="bi bi-file-text"></i> 问题详情</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -292,8 +314,13 @@
                 </div>
                 
                 <div class="mb-3">
-                    <strong>提案内容：</strong>
+                    <strong>问题内容：</strong>
                     <div class="bg-light p-3 rounded mt-2" id="view-content"></div>
+                </div>
+                
+                <div class="mb-3" id="view-answer-section" style="display: none;">
+                    <strong>提交者的答案/解决方案：</strong>
+                    <div class="bg-primary bg-opacity-10 p-3 rounded mt-2" id="view-answer"></div>
                 </div>
                 
                 <div class="mb-3">
@@ -302,7 +329,7 @@
                 </div>
                 
                 <div class="mb-3" id="view-revised-section" style="display: none;">
-                    <strong>修正提案：</strong>
+                    <strong>修正问题：</strong>
                     <div class="bg-info bg-opacity-10 p-3 rounded mt-2" id="view-revised-proposal"></div>
                 </div>
                 
@@ -330,7 +357,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-pencil"></i> 处理提案</h5>
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> 处理问题</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ url_for('update_feedback') }}">
@@ -342,7 +369,7 @@
                             <i class="bi bi-flag"></i> 处理状态 <span class="text-danger">*</span>
                         </label>
                         <select class="form-select" id="edit-status" name="status" required>
-                            <option value="新提案">新提案</option>
+                            <option value="新问题">新问题</option>
                             <option value="处理中">处理中</option>
                             <option value="已解决">已解决</option>
                         </select>
@@ -350,10 +377,27 @@
                     
                     <div class="mb-3">
                         <label for="edit-revised-proposal" class="form-label">
-                            <i class="bi bi-lightbulb"></i> 修正提案
+                            <i class="bi bi-lightbulb"></i> 修正问题
                         </label>
                         <textarea class="form-control" id="edit-revised-proposal" name="revised_proposal" rows="3" 
-                                placeholder="如有需要，请提供修正后的提案内容..."></textarea>
+                                placeholder="如有需要，请提供修正后的问题内容..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="edit-has-answer" name="has_answer" value="1" checked>
+                            <label class="form-check-label" for="edit-has-answer">
+                                <i class="bi bi-lightbulb-fill"></i> 我有答案或解决方案
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="answer-section">
+                        <label for="edit-answer" class="form-label">
+                            <i class="bi bi-check-circle"></i> 答案/解决方案
+                        </label>
+                        <textarea class="form-control" id="edit-answer" name="answer" rows="4" 
+                                placeholder="请提供具体的答案或解决方案..."></textarea>
                     </div>
                     
                     <div class="mb-3">
@@ -367,7 +411,7 @@
                     <div class="alert alert-info border-0" role="alert">
                         <h6><i class="bi bi-info-circle"></i> 处理指南</h6>
                         <ul class="mb-0 small">
-                            <li><strong>新提案：</strong>刚收到的反馈，尚未开始处理</li>
+                            <li><strong>新问题：</strong>刚收到的反馈，尚未开始处理</li>
                             <li><strong>处理中：</strong>正在分析或解决中，可填写进展说明</li>
                             <li><strong>已解决：</strong>问题已解决或建议已采纳，需填写处理结果</li>
                         </ul>
@@ -417,22 +461,31 @@ function filterFeedback(status) {
 }
 
 // 查看反馈详情
-function viewFeedback(id, username, content, status, revisedProposal, adminComment, handler) {
+function viewFeedback(id, username, content, status, revisedProposal, adminComment, handler, hasAnswer, answer) {
     document.getElementById('view-id').textContent = id;
     document.getElementById('view-username').textContent = username;
     document.getElementById('view-content').textContent = content;
     
     // 状态徽章
     const statusBadge = document.getElementById('view-status-badge');
-    if (status === '新提案') {
-        statusBadge.innerHTML = '<span class="badge bg-primary">新提案</span>';
+    if (status === '新问题') {
+            statusBadge.innerHTML = '<span class="badge bg-primary">新问题</span>';
     } else if (status === '处理中') {
         statusBadge.innerHTML = '<span class="badge bg-warning">处理中</span>';
     } else if (status === '已解决') {
         statusBadge.innerHTML = '<span class="badge bg-success">已解决</span>';
     }
     
-    // 修正提案
+    // 答案/解决方案
+    const answerSection = document.getElementById('view-answer-section');
+    if (hasAnswer && (hasAnswer === '1' || hasAnswer === 1 || hasAnswer === true) && answer && answer.trim()) {
+        document.getElementById('view-answer').textContent = answer;
+        answerSection.style.display = 'block';
+    } else {
+        answerSection.style.display = 'none';
+    }
+    
+    // 修正问题
     const revisedSection = document.getElementById('view-revised-section');
     if (revisedProposal && revisedProposal.trim()) {
         document.getElementById('view-revised-proposal').textContent = revisedProposal;
@@ -472,16 +525,28 @@ function viewFeedbackFromData(button) {
     var revised = button.getAttribute('data-revised');
     var comment = button.getAttribute('data-comment');
     var handler = button.getAttribute('data-handler');
+    var hasAnswer = button.getAttribute('data-has-answer');
+    var answer = button.getAttribute('data-answer');
     
-    viewFeedback(id, username, content, status, revised, comment, handler);
+    viewFeedback(id, username, content, status, revised, comment, handler, hasAnswer, answer);
 }
 
 // 编辑反馈
-function editFeedback(id, status, revisedProposal, adminComment) {
+function editFeedback(id, status, revisedProposal, adminComment, hasAnswer, answer) {
     document.getElementById('edit-feedback-id').value = id;
     document.getElementById('edit-status').value = status;
     document.getElementById('edit-revised-proposal').value = revisedProposal || '';
     document.getElementById('edit-admin-comment').value = adminComment || '';
+    
+    // 设置has_answer复选框状态
+    const hasAnswerCheckbox = document.getElementById('edit-has-answer');
+    hasAnswerCheckbox.checked = hasAnswer === '1' || hasAnswer === 1 || hasAnswer === true;
+    
+    // 设置answer字段值
+    document.getElementById('edit-answer').value = answer || '';
+    
+    // 控制答案输入框的显示/隐藏
+    toggleAnswerSection();
     
     const modal = new bootstrap.Modal(document.getElementById('editFeedbackModal'));
     modal.show();
@@ -493,11 +558,27 @@ function editFeedbackFromData(button) {
     var status = button.getAttribute('data-status');
     var revised = button.getAttribute('data-revised');
     var comment = button.getAttribute('data-comment');
+    var hasAnswer = button.getAttribute('data-has-answer');
+    var answer = button.getAttribute('data-answer');
     
-    editFeedback(id, status, revised, comment);
+    editFeedback(id, status, revised, comment, hasAnswer, answer);
 }
 
-// 删除提案
+// 控制答案输入框的显示/隐藏
+function toggleAnswerSection() {
+    const hasAnswerCheckbox = document.getElementById('edit-has-answer');
+    const answerSection = document.getElementById('answer-section');
+    
+    if (hasAnswerCheckbox.checked) {
+        answerSection.style.display = 'block';
+    } else {
+        answerSection.style.display = 'none';
+        // 清空答案内容
+        document.getElementById('edit-answer').value = '';
+    }
+}
+
+// 删除问题
 function deleteFeedback(button) {
     try {
         console.log('deleteFeedback called with button:', button);
@@ -523,20 +604,20 @@ function showDeleteConfirmModal(feedbackId, username, button) {
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> 确认删除提案</h5>
+                        <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> 确认删除问题</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-warning" role="alert">
                             <strong>警告：</strong>此操作不可撤销！删除后将自动通知提议人。
                         </div>
-                        <p><strong>提案编号：</strong>#${feedbackId}</p>
+                        <p><strong>问题编号：</strong>#${feedbackId}</p>
                         <p><strong>提议人：</strong>${username}</p>
                         
                         <div class="mb-3">
                             <label for="deletionReason" class="form-label">删除原因（可选）：</label>
                             <textarea class="form-control" id="deletionReason" rows="3" 
-                                    placeholder="请简要说明删除此提案的原因，此信息将发送给提议人..."></textarea>
+                                    placeholder="请简要说明删除此问题的原因，此信息将发送给提议人..."></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -662,8 +743,13 @@ function confirmDelete(feedbackId, username) {
 }
 
 // 发送手动邮件提醒
-function sendManualReminder(username) {
-    if (!confirm(`确定要向 ${username} 发送邮件提醒吗？`)) {
+function sendManualReminder(username, targetEmail = 'auto') {
+    let confirmMessage = `确定要向 ${username} 发送邮件提醒吗？`;
+    if (targetEmail !== 'auto') {
+        confirmMessage = `确定要向 ${username} 的邮箱 ${targetEmail} 发送邮件提醒吗？`;
+    }
+    
+    if (!confirm(confirmMessage)) {
         return;
     }
     
@@ -672,14 +758,20 @@ function sendManualReminder(username) {
     button.disabled = true;
     button.innerHTML = '<i class="bi bi-hourglass-split"></i>';
     
+    const requestBody = {
+        user_identifier: username
+    };
+    
+    if (targetEmail !== 'auto') {
+        requestBody.target_email = targetEmail;
+    }
+    
     fetch('/send_manual_reminder', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            user_identifier: username
-        })
+        body: JSON.stringify(requestBody)
     })
     .then(response => response.json())
     .then(data => {
@@ -729,5 +821,16 @@ function showAlert(type, message) {
 setInterval(function() {
     // 可以添加AJAX请求来更新数据，这里暂时不实现
 }, 300000); // 5分钟刷新一次
+
+// 页面加载完成后添加事件监听器
+document.addEventListener('DOMContentLoaded', function() {
+    // 为has_answer复选框添加变化事件监听器
+    const hasAnswerCheckbox = document.getElementById('edit-has-answer');
+    if (hasAnswerCheckbox) {
+        hasAnswerCheckbox.addEventListener('change', toggleAnswerSection);
+        // 初始化答案输入框的显示状态
+        toggleAnswerSection();
+    }
+});
 </script>
 {% endblock %}

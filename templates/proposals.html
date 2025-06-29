@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}提案列表 - EI Power反馈管理系统{% endblock %}
+{% block title %}问题列表 - EI Power反馈管理系统{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2><i class="bi bi-collection"></i> 所有提案</h2>
+            <h2><i class="bi bi-collection"></i> 所有问题</h2>
             <div>
                 <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-house"></i> 返回首页
@@ -27,7 +27,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-body text-center">
                 <h3 class="text-primary">{{ stats.total }}</h3>
-                <p class="mb-0 text-muted">总提案数</p>
+                <p class="mb-0 text-muted">总问题数</p>
             </div>
         </div>
     </div>
@@ -35,7 +35,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-body text-center">
                 <h3 class="text-info">{{ stats.new_count }}</h3>
-                <p class="mb-0 text-muted">新提案</p>
+                <p class="mb-0 text-muted">新问题</p>
             </div>
         </div>
     </div>
@@ -67,14 +67,14 @@
                         <label class="form-label">状态筛选</label>
                         <select name="status" class="form-select" onchange="this.form.submit()">
                             <option value="all" {% if current_status == 'all' %}selected{% endif %}>全部状态</option>
-                            <option value="新提案" {% if current_status == '新提案' %}selected{% endif %}>新提案</option>
+                            <option value="新问题" {% if current_status == '新问题' %}selected{% endif %}>新问题</option>
                             <option value="处理中" {% if current_status == '处理中' %}selected{% endif %}>处理中</option>
                             <option value="已解决" {% if current_status == '已解决' %}selected{% endif %}>已解决</option>
                         </select>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">搜索内容</label>
-                        <input type="text" name="search" class="form-control" placeholder="搜索提案内容..." value="{{ search_query }}">
+                        <input type="text" name="search" class="form-control" placeholder="搜索问题内容..." value="{{ search_query }}">
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">&nbsp;</label>
@@ -93,7 +93,7 @@
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-list-ul"></i> 提案列表 ({{ proposals|length }} 条)</h5>
+                <h5 class="mb-0"><i class="bi bi-list-ul"></i> 问题列表 ({{ proposals|length }} 条)</h5>
             </div>
             <div class="card-body">
                 {% if proposals %}
@@ -103,7 +103,7 @@
                                 <tr>
                                     <th style="width: 12%;">编号</th>
                                     <th style="width: 10%;">提议人</th>
-                                    <th style="width: 35%;">提案内容</th>
+                                    <th style="width: 35%;">问题内容</th>
                                     <th style="width: 8%;">状态</th>
                                     <th style="width: 10%;">提交时间</th>
                                     <th style="width: 10%;">处理人</th>
@@ -124,7 +124,7 @@
                                         </div>
                                     </td>
                                     <td>
-                                        {% if proposal.status == '新提案' %}
+                                        {% if proposal.status == '新问题' %}
                                             <span class="badge bg-primary">{{ proposal.status }}</span>
                                         {% elif proposal.status == '处理中' %}
                                             <span class="badge bg-warning">{{ proposal.status }}</span>
@@ -167,8 +167,8 @@
                 {% else %}
                     <div class="text-center py-4">
                         <i class="bi bi-inbox display-1 text-muted"></i>
-                        <h5 class="text-muted mt-3">暂无提案</h5>
-                        <p class="text-muted">当前筛选条件下没有找到提案</p>
+                        <h5 class="text-muted mt-3">暂无问题</h5>
+                <p class="text-muted">当前筛选条件下没有找到问题</p>
                     </div>
                 {% endif %}
             </div>
@@ -176,12 +176,12 @@
     </div>
 </div>
 
-<!-- 提案详情模态框 -->
+<!-- 问题详情模态框 -->
 <div class="modal fade" id="proposalDetailModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-file-text"></i> 提案详情</h5>
+                <h5 class="modal-title"><i class="bi bi-file-text"></i> 问题详情</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -208,7 +208,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <strong>提案内容：</strong>
+                    <strong>问题内容：</strong>
                     <div class="bg-light p-3 rounded mt-2" id="detail-content"></div>
                 </div>
                 
@@ -218,7 +218,7 @@
                 </div>
                 
                 <div class="mb-3" id="detail-revised-section" style="display: none;">
-                    <strong>修正提案：</strong>
+                    <strong>修正问题：</strong>
                     <div class="bg-info bg-opacity-10 p-3 rounded mt-2" id="detail-revised-proposal"></div>
                 </div>
                 
@@ -253,7 +253,7 @@ function viewProposalDetail(button) {
     const statusBadge = document.getElementById('detail-status-badge');
     statusBadge.textContent = data.status;
     statusBadge.className = 'badge ';
-    if (data.status === '新提案') {
+    if (data.status === '新问题') {
         statusBadge.className += 'bg-primary';
     } else if (data.status === '处理中') {
         statusBadge.className += 'bg-warning';
@@ -261,7 +261,7 @@ function viewProposalDetail(button) {
         statusBadge.className += 'bg-success';
     }
     
-    // 显示/隐藏修正提案
+    // 显示/隐藏修正问题
     const revisedSection = document.getElementById('detail-revised-section');
     if (data.revised && data.revised.trim()) {
         document.getElementById('detail-revised-proposal').textContent = data.revised;
