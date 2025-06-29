@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime, date
 import sqlite3
 import os
+import csv
+import io
 from apscheduler.schedulers.background import BackgroundScheduler
 from email_service import send_reminder_email, check_and_send_reminders, send_manual_reminder
 from database import init_db, get_db_connection
@@ -267,6 +269,66 @@ def admin_panel():
                          users_status=users_status, 
                          pending_feedback=pending_feedback,
                          resolved_feedback=resolved_feedback)
+
+@app.route('/admin/export_resolved', methods=['GET'])
+@login_required
+def export_resolved_feedback():
+    """导出已解决问题为CSV格式"""
+    if not current_user.is_admin:
+        flash('权限不足', 'error')
+        return redirect(url_for('dashboard'))
+    
+    conn = get_db_connection()
+    
+    # 获取所有已解决的反馈，包含管理员修正的问题内容
+    resolved_feedback = conn.execute('''
+        SELECT f.id, f.content, f.revised_proposal, f.answer, f.updated_at, u.name
+        FROM feedback f 
+        JOIN users u ON f.user_id = u.id 
+        WHERE f.status = "已解决" 
+        ORDER BY f.updated_at DESC
+    ''').fetchall()
+    
+    conn.close()
+    
+    # 创建CSV内容
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # 写入标题行
+    writer.writerow(['序号', '问题', '答案', '时间'])
+    
+    # 写入数据行
+    for i, feedback in enumerate(resolved_feedback, 1):
+        # 使用管理员修正的问题内容，如果没有则使用原始内容
+        problem_content = feedback['revised_proposal'] if feedback['revised_proposal'] else feedback['content']
+        answer_content = feedback['answer'] if feedback['answer'] else '无答案'
+        
+        # 处理时间格式
+        if feedback['updated_at']:
+            try:
+                updated_time = datetime.fromisoformat(feedback['updated_at'].replace('Z', '+00:00'))
+                time_str = updated_time.strftime('%Y-%m-%d %H:%M:%S')
+            except:
+                try:
+                    updated_time = datetime.strptime(feedback['updated_at'], '%Y-%m-%d %H:%M:%S')
+                    time_str = updated_time.strftime('%Y-%m-%d %H:%M:%S')
+                except:
+                    time_str = feedback['updated_at']
+        else:
+            time_str = '未知时间'
+        
+        writer.writerow([i, problem_content, answer_content, time_str])
+    
+    # 创建响应
+    output.seek(0)
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    # 使用英文文件名避免编码问题
+    filename = f'resolved_issues_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+    response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
 
 @app.route('/admin/update_feedback', methods=['POST'])
 @login_required
@@ -719,15 +781,27 @@ if __name__ == '__main__':
     # 初始化数据库
     init_db()
     
-    # 设置定时任务
+    # 设置定时任务 - 每天4点和6点发送提醒
     scheduler = BackgroundScheduler()
+    
+    # 早上4点提醒
     scheduler.add_job(
         func=check_and_send_reminders,
         trigger="cron",
         hour=16,
         minute=0,
-        id='daily_reminder'
+        id='morning_reminder_4pm'
     )
+    
+    # 早上6点提醒
+    scheduler.add_job(
+        func=check_and_send_reminders,
+        trigger="cron",
+        hour=18,
+        minute=0,
+        id='morning_reminder_6pm'
+    )
+    
     scheduler.start()
     
     try:
