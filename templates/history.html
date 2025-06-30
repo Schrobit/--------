@@ -110,20 +110,33 @@
                                     </small>
                                 </td>
                                 <td>
-                                    <button class="btn btn-outline-info btn-sm" 
-                                            data-id="{{ feedback.id }}"
-                                            data-content="{{ feedback.content|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                            data-status="{{ feedback.status }}"
-                                            data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                            data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                            data-handler="{{ feedback.handler or '' }}"
-                                            data-has-answer="{{ feedback.has_answer or false }}"
-                                            data-answer="{{ (feedback.answer or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
-                                            data-created="{{ feedback.created_at.strftime('%Y-%m-%d %H:%M') if feedback.created_at else '' }}"
-                                            data-updated="{{ feedback.updated_at.strftime('%Y-%m-%d %H:%M') if feedback.updated_at else '' }}"
-                                            onclick="showFeedbackDetailFromData(this)">
-                                        <i class="bi bi-eye"></i> 详情
-                                    </button>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-outline-info btn-sm" 
+                                                data-id="{{ feedback.id }}"
+                                                data-content="{{ feedback.content|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-status="{{ feedback.status }}"
+                                                data-revised="{{ (feedback.revised_proposal or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-comment="{{ (feedback.admin_comment or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-handler="{{ feedback.handler or '' }}"
+                                                data-has-answer="{{ feedback.has_answer or false }}"
+                                                data-answer="{{ (feedback.answer or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-created="{{ feedback.created_at.strftime('%Y-%m-%d %H:%M') if feedback.created_at else '' }}"
+                                                data-updated="{{ feedback.updated_at.strftime('%Y-%m-%d %H:%M') if feedback.updated_at else '' }}"
+                                                onclick="showFeedbackDetailFromData(this)">
+                                            <i class="bi bi-eye"></i> 详情
+                                        </button>
+                                        {% if feedback.status == '新问题' %}
+                                        <button class="btn btn-outline-primary btn-sm" 
+                                                data-id="{{ feedback.id }}"
+                                                data-content="{{ feedback.content|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                data-has-answer="{{ feedback.has_answer or false }}"
+                                                data-answer="{{ (feedback.answer or '')|replace('"', '&quot;')|replace("'", "&#39;") }}"
+                                                onclick="editFeedbackFromData(this)"
+                                                title="编辑问题">
+                                            <i class="bi bi-pencil"></i> 编辑
+                                        </button>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -152,6 +165,67 @@
     </div>
 </div>
 {% endif %}
+
+<!-- 编辑问题模态框 -->
+<div class="modal fade" id="editFeedbackModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> 编辑问题</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editFeedbackForm" method="POST" action="{{ url_for('edit_user_feedback') }}">
+                <div class="modal-body">
+                    <input type="hidden" id="edit-feedback-id" name="feedback_id">
+                    
+                    <div class="mb-3">
+                        <label for="edit-content" class="form-label">
+                            <i class="bi bi-chat-text"></i> 问题内容 <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="edit-content" name="content" rows="6" 
+                                placeholder="请详细描述您遇到的问题、建议或意见..." 
+                                required maxlength="1000"></textarea>
+                        <div class="form-text">
+                            <span class="text-muted">还可输入 <span id="edit-char-count">1000</span> 个字符</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="edit-has-answer" name="has_answer" value="1">
+                            <label class="form-check-label" for="edit-has-answer">
+                                <i class="bi bi-lightbulb-fill"></i> 我有答案或解决方案
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="edit-answer-section" style="display: none;">
+                        <label for="edit-answer" class="form-label">
+                            <i class="bi bi-check-circle"></i> 您的答案或解决方案
+                        </label>
+                        <textarea class="form-control" id="edit-answer" name="answer" rows="4" 
+                                placeholder="请详细描述您的答案或解决方案..." 
+                                maxlength="1000"></textarea>
+                        <div class="form-text">
+                            <span class="text-muted">还可输入 <span id="edit-answer-char-count">1000</span> 个字符</span>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info border-0" role="alert">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>注意：</strong>只有状态为"新问题"的问题才能编辑。编辑后问题将保持"新问题"状态。
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> 保存修改
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- 反馈详情模态框 -->
 <div class="modal fade" id="feedbackDetailModal" tabindex="-1">
@@ -332,5 +406,72 @@ function showFeedbackDetailFromData(button) {
     
     showFeedbackDetail(id, content, status, revised, comment, handler, hasAnswer, answer, created, updated);
 }
+
+// 编辑问题功能
+function editFeedbackFromData(button) {
+    var id = button.getAttribute('data-id');
+    var content = button.getAttribute('data-content');
+    var hasAnswer = button.getAttribute('data-has-answer');
+    var answer = button.getAttribute('data-answer');
+    
+    // 设置表单数据
+    document.getElementById('edit-feedback-id').value = id;
+    document.getElementById('edit-content').value = content;
+    
+    // 设置has_answer复选框状态
+    const hasAnswerCheckbox = document.getElementById('edit-has-answer');
+    hasAnswerCheckbox.checked = hasAnswer === 'True' || hasAnswer === '1' || hasAnswer === 1 || hasAnswer === true;
+    
+    // 设置answer字段值
+    document.getElementById('edit-answer').value = answer || '';
+    
+    // 控制答案输入框的显示/隐藏
+    toggleEditAnswerSection();
+    
+    // 更新字符计数
+    updateEditCharCount();
+    updateEditAnswerCharCount();
+    
+    // 显示模态框
+    const modal = new bootstrap.Modal(document.getElementById('editFeedbackModal'));
+    modal.show();
+}
+
+// 控制编辑模态框中答案输入框的显示/隐藏
+function toggleEditAnswerSection() {
+    const hasAnswerCheckbox = document.getElementById('edit-has-answer');
+    const answerSection = document.getElementById('edit-answer-section');
+    
+    if (hasAnswerCheckbox.checked) {
+        answerSection.style.display = 'block';
+    } else {
+        answerSection.style.display = 'none';
+        document.getElementById('edit-answer').value = '';
+    }
+}
+
+// 更新编辑模态框中问题内容的字符计数
+function updateEditCharCount() {
+    const content = document.getElementById('edit-content').value;
+    const remaining = 1000 - content.length;
+    document.getElementById('edit-char-count').textContent = remaining;
+}
+
+// 更新编辑模态框中答案的字符计数
+function updateEditAnswerCharCount() {
+    const answer = document.getElementById('edit-answer').value;
+    const remaining = 1000 - answer.length;
+    document.getElementById('edit-answer-char-count').textContent = remaining;
+}
+
+// 绑定编辑模态框事件
+document.addEventListener('DOMContentLoaded', function() {
+    // 绑定has_answer复选框变化事件
+    document.getElementById('edit-has-answer').addEventListener('change', toggleEditAnswerSection);
+    
+    // 绑定字符计数事件
+    document.getElementById('edit-content').addEventListener('input', updateEditCharCount);
+    document.getElementById('edit-answer').addEventListener('input', updateEditAnswerCharCount);
+});
 </script>
 {% endblock %}

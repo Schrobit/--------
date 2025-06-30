@@ -193,6 +193,57 @@ def history():
     
     return render_template('history.html', feedback_list=feedback_list)
 
+@app.route('/edit_user_feedback', methods=['POST'])
+@login_required
+def edit_user_feedback():
+    """用户编辑自己的问题"""
+    feedback_id = request.form.get('feedback_id')
+    content = request.form.get('content')
+    has_answer = 1 if request.form.get('has_answer') else 0
+    answer = request.form.get('answer', '')
+    
+    if not feedback_id or not content:
+        flash('问题内容不能为空')
+        return redirect(url_for('history'))
+    
+    conn = get_db_connection()
+    
+    # 检查问题是否属于当前用户且状态为"新问题"
+    feedback = conn.execute(
+        'SELECT * FROM feedback WHERE id = ? AND user_id = ?',
+        (feedback_id, current_user.id)
+    ).fetchone()
+    
+    if not feedback:
+        flash('问题不存在或无权限编辑')
+        conn.close()
+        return redirect(url_for('history'))
+    
+    if feedback['status'] != '新问题':
+        flash('只能编辑状态为"新问题"的问题')
+        conn.close()
+        return redirect(url_for('history'))
+    
+    # 更新问题
+    try:
+        conn.execute('''
+            UPDATE feedback 
+            SET content = ?, has_answer = ?, answer = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ?
+        ''', (content, has_answer, answer, feedback_id, current_user.id))
+        
+        conn.commit()
+        flash('问题修改成功')
+        
+    except Exception as e:
+        conn.rollback()
+        flash(f'修改失败: {str(e)}')
+        
+    finally:
+        conn.close()
+    
+    return redirect(url_for('history'))
+
 @app.route('/admin')
 @login_required
 def admin_panel():
